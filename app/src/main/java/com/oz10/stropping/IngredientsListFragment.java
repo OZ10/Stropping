@@ -21,6 +21,9 @@ import java.util.ArrayList;
 public class IngredientsListFragment extends Fragment {
 
     ArrayList<Ingredient> _ingredientsList = new ArrayList<>();
+    ListView _ingredientsListView;
+    ArrayAdapter<Ingredient> _ingredientsAdatper;
+    Boolean _hasSelectedItems = false;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -28,20 +31,16 @@ public class IngredientsListFragment extends Fragment {
         ViewGroup rootView = (ViewGroup) inflater.inflate(
                 R.layout.fragment_ingredients, container, false);
 
-//        FragmentIngredientsBinding binding = DataBindingUtil.inflate(inflater, R.layout.fragment_ingredients, container, false);
-//        IngredientsList ingredientsList = new IngredientsList();
-//        binding.setListItems(ingredientsList);
-
         _ingredientsList.add(new Ingredient("Apple", false));
         _ingredientsList.add(new Ingredient("Pear", false));
         _ingredientsList.add(new Ingredient("Snake", false));
 
-        ArrayAdapter<Ingredient> customAdapter = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
+        _ingredientsAdatper = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
 
-        ListView ingredientsListView = (ListView) rootView.findViewById(R.id.ingredientslistView);
-        ingredientsListView.setAdapter(customAdapter);
+        _ingredientsListView = (ListView) rootView.findViewById(R.id.ingredientslistView);
+        _ingredientsListView.setAdapter(_ingredientsAdatper);
 
-        ingredientsListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
+        _ingredientsListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
         {
             @Override
             public void onItemClick(AdapterView<?> parent, final View view,
@@ -50,49 +49,23 @@ public class IngredientsListFragment extends Fragment {
                 Ingredient selectedIngredient = (Ingredient) parent.getItemAtPosition(position);
                 selectedIngredient.setIsSelected();
 
+                if (selectedIngredient.getIsSelected()) _hasSelectedItems = true;
+
                 ChangeAddIngredientButton();
             }
         });
 
         return rootView;
-
-        //return binding.getRoot();
     }
 
-    private void SetupList()
-    {
-//        _ingredientsList.add(new Ingredient("Apple", false));
-//        _ingredientsList.add(new Ingredient("Pear", false));
-//        _ingredientsList.add(new Ingredient("Snake", false));
-//
-//        ArrayAdapter<Ingredient> customAdapter = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
-//
-//        ListView ingredientsListView = (ListView) getView().findViewById(R.id.ingredientslistView);
-//        ingredientsListView.setAdapter(customAdapter);
-//
-//        ingredientsListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
-//        {
-//            @Override
-//            public void onItemClick(AdapterView<?> parent, final View view,
-//                                    int position, long id)
-//            {
-//                Ingredient selectedIngredient = (Ingredient) parent.getItemAtPosition(position);
-//                selectedIngredient.setIsSelected();
-//
-//                //ChangeAddIngredientButton();
-//            }
-//        });
-    }
-//
     private void ChangeAddIngredientButton() {
         //TODO Check if there is at least one ingredient selected
         FloatingActionButton addButton = (FloatingActionButton) getActivity().findViewById(R.id.fab);
         addButton.setImageResource(R.drawable.ic_playlist_add_white_24dp);
     }
-//
+
     public ArrayList<String> getSelectedIngredients()
     {
-
         ArrayList<String> selectedIngredients = new ArrayList<>();
 
         for (Ingredient ingredient:_ingredientsList
@@ -102,6 +75,23 @@ public class IngredientsListFragment extends Fragment {
             }
         }
 
+        UnSelectAll();
+
         return selectedIngredients;
+    }
+
+    private void UnSelectAll()
+    {
+        _hasSelectedItems = false;
+
+        for (Ingredient ingredient : _ingredientsList
+             ) {
+            if (ingredient.getIsSelected()){
+                ingredient.setIsSelected();
+            }
+        }
+
+        _ingredientsAdatper.notifyDataSetChanged();
+        _ingredientsListView.clearChoices();
     }
 }

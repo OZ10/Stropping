@@ -9,9 +9,9 @@ import android.view.ViewGroup;
  * Created by Austen on 02/08/2016.
  */
 public class MainFragmentPagerAdapter extends FragmentStatePagerAdapter {
-    private ShoppingListFragment mShoppingListFragment;
-    private IngredientsListFragment mIngredientsFragment;
-    private Fragment mRecipesListFragment;
+    private ShoppingListFragment _ShoppingListFragment;
+    private IngredientsListFragment _IngredientsFragment;
+    private RecipesFragment _RecipesListFragment;
 
     public enum FragmentNames{
         ShoppingListFrag,
@@ -47,13 +47,13 @@ public class MainFragmentPagerAdapter extends FragmentStatePagerAdapter {
         Fragment createdFragment = (Fragment) super.instantiateItem(container, position);
         switch (position){
             case 0:
-                mShoppingListFragment = (ShoppingListFragment) createdFragment;
+                _ShoppingListFragment = (ShoppingListFragment) createdFragment;
                 break;
             case 1:
-                mIngredientsFragment = (IngredientsListFragment) createdFragment;
+                _IngredientsFragment = (IngredientsListFragment) createdFragment;
                 break;
             case 2:
-                mRecipesListFragment = (RecipesFragment) createdFragment;
+                _RecipesListFragment = (RecipesFragment) createdFragment;
                 break;
         }
         return createdFragment;
@@ -62,11 +62,11 @@ public class MainFragmentPagerAdapter extends FragmentStatePagerAdapter {
     public Object GetFragmentByIndex(int index){
         switch (index){
             case 0:
-               if (mShoppingListFragment != null) return mShoppingListFragment;
+               if (_ShoppingListFragment != null) return _ShoppingListFragment;
             case 1:
-                if (mIngredientsFragment != null) return mIngredientsFragment;
+                if (_IngredientsFragment != null) return _IngredientsFragment;
             case 2:
-                if (mRecipesListFragment != null) return mRecipesListFragment;
+                if (_RecipesListFragment != null) return _RecipesListFragment;
         }
         return null;
     }

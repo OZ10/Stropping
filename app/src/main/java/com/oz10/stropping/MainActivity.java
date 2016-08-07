@@ -29,10 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private MainFragmentPagerAdapter _pagerAdapter;
     private ViewPagerNoSwipe _pager;
     private Toolbar _mainToolbar;
-
-    static final int ADD_NEW_INGREDIENT_REQUEST = 1;
-    //ArrayList<String> shoppingListItems = new ArrayList<String>();
-    //ArrayAdapter shoppingListAdapter;
+    private FloatingActionButton _mainButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,23 +37,13 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
+        _mainButton = (FloatingActionButton) findViewById(R.id.fab);
+
         SetupToolbar();
 
         SetupViewPager();
 
         SetupBottomBar(savedInstanceState);
-
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-//        fab.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                //Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                //        .setAction("Action", null).show();
-//                Intent intent = new Intent(this, IngredientsActivity.class);
-//            }
-//        });
-
-        //SetupList();
     }
 
     private void SetupToolbar()
@@ -89,14 +76,17 @@ public class MainActivity extends AppCompatActivity {
                     case R.id.bottomBarItemOne:
                         _pager.setCurrentItem(0);
                         _mainToolbar.setTitle(R.string.Toolbar_ShoppingList);
+                        SetMainButtonIcon(0);
                         break;
                     case R.id.bottomBarItemTwo:
                         _pager.setCurrentItem(1);
                         _mainToolbar.setTitle(R.string.Toolbar_Ingredients);
+                        SetMainButtonIcon(1);
                         break;
                     case R.id.bottomBarItemThree:
                         _pager.setCurrentItem(2);
                         _mainToolbar.setTitle(R.string.Toolbar_Recipes);
+                        SetMainButtonIcon(2);
                         break;
                 }
             }
@@ -122,11 +112,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void SetMainButtonIcon(int button)
+    {
+        // Shopping list or recipes
+        if (button == 0 || button == 2){
+            _mainButton.setImageResource(R.drawable.ic_add_white_24dp);
+        }
+        else{
+            IngredientsListFragment ingredientsListFragment = (IngredientsListFragment) _pagerAdapter.GetFragmentByIndex(1);
+            if (ingredientsListFragment._hasSelectedItems){
+                _mainButton.setImageResource(R.drawable.ic_playlist_add_white_24dp);
+            }
+        }
+
+    }
+
     private void addShoppingListItem_Click(int button) {
+        //IngredientsListFragment ingredientsListFragment = (IngredientsListFragment) _pagerAdapter.GetFragmentByIndex(1);
         SelectBottombarTab(button);
     }
 
     private void addIngredients_Click(IngredientsListFragment ingredientsFrag) {
+        //TODO Move all this code to the ingredients fragment
         ArrayList<String> selectedIngredients = ingredientsFrag.getSelectedIngredients();
 
         if (selectedIngredients.size() != 0){
