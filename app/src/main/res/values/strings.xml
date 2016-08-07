@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Stropping</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="Toolbar_ShoppingList">Shopping List</string>
+    <string name="Toolbar_Ingredients">Ingredients</string>
+    <string name="Toolbar_Recipes">Recipes</string>
+</resources>
