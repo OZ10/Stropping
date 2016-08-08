@@ -3,16 +3,16 @@ package com.classes;
 /**
  * Created by Austen on 01/08/2016.
  */
-public class Ingredient {
+public class Ingredient extends BaseItem {
 
-    private String name;
+//    private String name;
     private Boolean isSelected;
 
-    public String getName()
-    { return name; }
-
-    public void setName(String value)
-    { name = value; }
+//    public String getName()
+//    { return name; }
+//
+//    public void setName(String value)
+//    { name = value; }
 
     public Boolean getIsSelected()
     { return isSelected; }

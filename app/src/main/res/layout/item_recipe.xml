@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="match_parent"
+    android:layout_height="220dp">
+
+    <android.support.v7.widget.CardView
+        xmlns:card_view="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/recipe_card_view"
+        android:layout_gravity="center"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        card_view:cardCornerRadius="4dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp">
+
+            <ImageView
+                android:id="@+id/recipe_imageView"
+                android:layout_width="match_parent"
+                android:layout_height="130dp"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentLeft="false"
+                android:src="@drawable/ic_pot_mix_grey600_48dp"
+                android:layout_centerHorizontal="true"
+                 />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_below="@+id/recipe_imageView"
+                android:weightSum="1.0"
+                android:layout_alignParentBottom="false">
+
+                <TextView
+                    android:id="@+id/recipe_name"
+                    android:layout_width="0dp"
+                    android:layout_height="fill_parent"
+                    android:text="CardView"
+                    android:layout_alignParentBottom="false"
+                    android:gravity="fill_vertical"
+                    android:layout_weight="0.7"/>
+
+                <Button
+                    android:id="@+id/recipe_addButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/recipe_imageView"
+                    android:layout_toRightOf="@+id/recipe_name"
+                    android:drawableLeft="@drawable/ic_add_black_24dp"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_weight="0.3"
+                    />
+            </LinearLayout>
+
+        </RelativeLayout>
+
+
+    </android.support.v7.widget.CardView>
+
+</LinearLayout>
