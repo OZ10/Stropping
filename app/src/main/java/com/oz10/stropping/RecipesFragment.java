@@ -19,6 +19,9 @@ import java.util.ArrayList;
  * Created by Austen on 04/08/2016.
  */
 public class RecipesFragment extends Fragment {
+
+    RecipeListAdapter _recipeListAdapter;
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -33,8 +36,8 @@ public class RecipesFragment extends Fragment {
         recipeList.add(new Recipe("Spicy Sausage Rice"));
         recipeList.add(new Recipe("Pasta"));
 
-        RecipeListAdapter recipeListAdapter = new RecipeListAdapter(recipeList);
-        recipes_RecyclerView.setAdapter(recipeListAdapter);
+        _recipeListAdapter = new RecipeListAdapter(recipeList);
+        recipes_RecyclerView.setAdapter(_recipeListAdapter);
         return rootView;
     }
 }

@@ -1,5 +1,6 @@
 package com.adapters;
 
+import android.content.Intent;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
@@ -9,6 +10,7 @@ import android.widget.TextView;
 
 import com.classes.Recipe;
 import com.oz10.stropping.R;
+import com.oz10.stropping.RecipeEditActivity;
 
 import java.util.List;
 
@@ -25,6 +27,12 @@ public class RecipeListAdapter extends RecyclerView.Adapter<RecipeListAdapter.Re
             super(view);
             cardView = (CardView)view.findViewById(R.id.recipe_card_view);
             recipeName = (TextView)view.findViewById(R.id.recipe_name);
+
+            cardView.setOnClickListener(new View.OnClickListener(){
+                @Override public void onClick(View view){
+                    //TODO Open Edit Recipes activity
+                }
+            });
         }
     }
 
@@ -54,5 +62,10 @@ public class RecipeListAdapter extends RecyclerView.Adapter<RecipeListAdapter.Re
     @Override
     public void onAttachedToRecyclerView(RecyclerView recyclerView) {
         super.onAttachedToRecyclerView(recyclerView);
+    }
+
+    public void add(Recipe recipe)
+    {
+        recipes.add(recipe);
     }
 }

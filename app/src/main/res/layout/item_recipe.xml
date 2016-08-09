@@ -48,7 +48,7 @@
                     android:layout_height="wrap_content"
                     android:layout_below="@+id/recipe_imageView"
                     android:layout_toRightOf="@+id/recipe_name"
-                    android:drawableLeft="@drawable/ic_add_black_24dp"
+                    android:drawableLeft="@drawable/ic_playlist_add_black_24dp"
                     style="?android:attr/borderlessButtonStyle"
                     android:layout_weight="0.3"
                     />

@@ -1,5 +1,6 @@
 package com.oz10.stropping;
 
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 
 import android.os.Bundle;
@@ -18,12 +19,16 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.adapters.RecipeListAdapter;
+import com.classes.Recipe;
 import com.roughike.bottombar.BottomBar;
 import com.roughike.bottombar.OnMenuTabClickListener;
 
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
+
+    static final int ADDNEW_RECIPE_REQUEST = 1;
 
     private BottomBar _bottombar;
     private MainFragmentPagerAdapter _pagerAdapter;
@@ -109,6 +114,11 @@ public class MainActivity extends AppCompatActivity {
             else if (currentFragment instanceof IngredientsListFragment){
               addIngredients_Click((IngredientsListFragment) currentFragment);
           }
+            else if (currentFragment instanceof RecipesFragment){
+              Intent intent = new Intent(this, RecipeEditActivity.class);
+              intent.putExtra("requestCode", ADDNEW_RECIPE_REQUEST);
+              startActivityForResult(intent, ADDNEW_RECIPE_REQUEST);
+          }
         }
     }
 
@@ -158,6 +168,21 @@ public class MainActivity extends AppCompatActivity {
     private void SelectBottombarTab(int button)
     {
         _bottombar.selectTabAtPosition(button, true);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == ADDNEW_RECIPE_REQUEST) {
+            if(resultCode == RESULT_OK){
+                //TODO This needs to be refactored
+                RecipesFragment recipesFragment = (RecipesFragment) _pagerAdapter.GetFragmentByIndex(2);
+                RecipeListAdapter recipeListAdapter = recipesFragment._recipeListAdapter;
+                String recipeName = data.getStringExtra("RecipeName");
+                recipeListAdapter.add(new Recipe(recipeName));
+                recipeListAdapter.notifyDataSetChanged();
+            }
+        }
     }
 
     // DEFAULT 'MY FIRST APP' CODE
