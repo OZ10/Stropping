@@ -20,6 +20,7 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import com.adapters.RecipeListAdapter;
+import com.adapters.database.StroppingDatabase;
 import com.classes.Recipe;
 import com.roughike.bottombar.BottomBar;
 import com.roughike.bottombar.OnMenuTabClickListener;
@@ -49,6 +50,11 @@ public class MainActivity extends AppCompatActivity {
         SetupViewPager();
 
         SetupBottomBar(savedInstanceState);
+
+//        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+//        stroppingDatabase.createIngredient("apple", "number of", 1, 1, 0, 0, 0, 0);
+//        stroppingDatabase.createIngredient("pear", "number of", 1, 1, 0, 0, 0, 0);
+//        stroppingDatabase.createIngredient("snake", "number of", 1, 1, 0, 0, 0, 0);
     }
 
     private void SetupToolbar()
@@ -63,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
         _pager = (ViewPagerNoSwipe) findViewById(R.id.pager);
         _pagerAdapter = new MainFragmentPagerAdapter(getSupportFragmentManager());
         _pager.setAdapter(_pagerAdapter);
+        _pager.setOffscreenPageLimit(2);
 
         //Disables swipe navigation
         _pager.setPagingEnabled(false);

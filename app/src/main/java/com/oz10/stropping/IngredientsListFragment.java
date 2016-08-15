@@ -51,7 +51,7 @@ public class IngredientsListFragment extends Fragment {
 
                 if (selectedIngredient.getIsSelected()) _hasSelectedItems = true;
 
-                ChangeAddIngredientButton();
+                //ChangeAddIngredientButton();
             }
         });
 

@@ -1,5 +1,7 @@
 package com.classes;
 
+import com.oz10.stropping.R;
+
 import java.util.ArrayList;
 
 /**
@@ -7,21 +9,40 @@ import java.util.ArrayList;
  */
 public class Recipe extends BaseItem {
 
-    public Recipe()
-    {
-        this.ingredients = new ArrayList<>();
+    private int recipeImage = R.drawable.ic_pot_mix_grey600_24dp;
+    private int serves;
+    private String notes;
+
+    public Long getId(){
+        return id;
     }
 
-    public Recipe(String name, ArrayList<Ingredient> ingredients)
-    {
-        this.name = name;
-        this.ingredients = ingredients;
+    public void setId(Long id){
+        this.id = id;
     }
 
-    public Recipe(String name)
-    {
-        this.name = name;
-        this.ingredients = new ArrayList<>();
+    public int getRecipeImage(){
+        return recipeImage;
+    }
+
+    public void setRecipeImage(int recipeImage){
+        this.recipeImage = recipeImage;
+    }
+
+    public int getServes(){
+        return serves;
+    }
+
+    public void setServes(int serves){
+        this.serves = serves;
+    }
+
+    public String getNotes(){
+        return notes;
+    }
+
+    public void setNotes(String notes){
+        this.notes = notes;
     }
 
     private ArrayList<Ingredient> ingredients;
@@ -39,5 +60,25 @@ public class Recipe extends BaseItem {
     public void removeIngredient(Ingredient ingredient)
     {
         this.ingredients.remove(ingredient);
+    }
+
+
+
+
+    public Recipe()
+    {
+        this.ingredients = new ArrayList<>();
+    }
+
+    public Recipe(String name, ArrayList<Ingredient> ingredients)
+    {
+        this.name = name;
+        this.ingredients = ingredients;
+    }
+
+    public Recipe(String name)
+    {
+        this.name = name;
+        this.ingredients = new ArrayList<>();
     }
 }

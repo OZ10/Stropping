@@ -31,6 +31,10 @@ public class RecipeListAdapter extends RecyclerView.Adapter<RecipeListAdapter.Re
             cardView.setOnClickListener(new View.OnClickListener(){
                 @Override public void onClick(View view){
                     //TODO Open Edit Recipes activity
+                    Intent intent = new Intent(cardView.getContext(), RecipeEditActivity.class);
+                    intent.putExtra("RecipeName", recipeName.getText());
+                    intent.putExtra("requestCode", 2);
+                    cardView.getContext().startActivity(intent);
                 }
             });
         }

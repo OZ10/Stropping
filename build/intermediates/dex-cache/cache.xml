@@ -1,3 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
-<items version="2" />
+<items version="2" >
 
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\incremental-runtime-classes\debug\instant-run.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="5149d893d34aff52b9eba9a13eb5c82dad59b43f">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\instant-run_396249258bd060b1b5deede0f748dc9ce2222408\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\incremental-classes\debug\instant-run-bootstrap.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="54879c1e6624142635cc14a3b007e608b01fc41c">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\instant-run-bootstrap_a5940714a7d079ec30f4166eec998e56db83d1a2\classes.dex" />
+    </item>
+    <item
+        jar="C:\Users\Austen\.gradle\caches\modules-2\files-2.1\com.android.support\support-annotations\24.1.1\3af19f153122737b372622fa6c81dd11a1c6b999\support-annotations-24.1.1.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="3af19f153122737b372622fa6c81dd11a1c6b999">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\support-annotations-24.1.1_f8c98c123177534b1f4b48c3f197766bae1f2684\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\recyclerview-v7\24.1.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="787871951412550519b0222aba3c9df4cea49875">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-recyclerview-v7-24.1.1_64d0b726239ddce0bd2f445a4e866a1fd7e793ba\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\support-v4\24.1.1\jars\libs\internal_impl-24.1.1.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="f78c2f395cb096f9dc1dc07e729922b8fcd3c4f5">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\internal_impl-24.1.1_96ed5ba396dffb78e377f4f109c5bca05f5b25d6\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\animated-vector-drawable\24.1.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="c936c1bd42f0c018c18920c7bec619ef056b24f8">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-animated-vector-drawable-24.1.1_6be6916c1d1e5fbcfb0919a193fb6c533b8fd87f\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\cardview-v7\24.0.0\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="8dd49930e4f9dde1a42d37e362b9fea8b1b69c0d">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-cardview-v7-24.0.0_97083e5f3acc4161b825719d640680650513c766\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\appcompat-v7\24.1.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="1256c10604bb098490eab070d76754ac5ceab35c">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-appcompat-v7-24.1.1_4d0ab1fa6cff60838cf68fd0a57523a6103481d2\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\support-vector-drawable\24.1.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="f62e763609f65e47dc6c498760a4accf02776788">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-support-vector-drawable-24.1.1_6e4b1bf58e6d7c6def7d88533165f12fd31669ed\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\design\24.1.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="e195bd694d5389acfba27ff4fdfa64c4c65b2c05">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-design-24.1.1_2540f0ee8633803ff36590924278c604660c23c9\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\support-v4\24.1.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="6d7d803871e3203465f71a163e7af104f807b446">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-support-v4-24.1.1_d8263ec8cdc48735334dcef94ac0f8f811c8039b\classes.dex" />
+    </item>
+    <item
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.roughike\bottom-bar\1.4.0.1\jars\classes.jar"
+        jumboMode="true"
+        revision="24.0.1"
+        sha1="c4e65d46b09bd2156ad6fdf147d08b17c0fef75c">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.roughike-bottom-bar-1.4.0.1_4f597d8cc4dedf06b3282c4b51c64a873e0f3398\classes.dex" />
+    </item>
+
+</items>
