@@ -50,11 +50,8 @@ public class MainActivity extends AppCompatActivity {
         SetupViewPager();
 
         SetupBottomBar(savedInstanceState);
-
-//        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
-//        stroppingDatabase.createIngredient("apple", "number of", 1, 1, 0, 0, 0, 0);
-//        stroppingDatabase.createIngredient("pear", "number of", 1, 1, 0, 0, 0, 0);
-//        stroppingDatabase.createIngredient("snake", "number of", 1, 1, 0, 0, 0, 0);
+        
+        SetupDatabase();
     }
 
     private void SetupToolbar()
@@ -108,6 +105,18 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
+    }
+    
+    private void SetupDatabase()
+    {
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+        stroppingDatabase.createIngredient("apple", "number of", 1, 1, 0, 0, 0, 0);
+        stroppingDatabase.createIngredient("pear", "number of", 1, 1, 0, 0, 0, 0);
+        stroppingDatabase.createIngredient("snake", "number of", 1, 1, 0, 0, 0, 0);
+        
+        stroppingDatabase.createRecipe("Spag", 2, "");
+        stroppingDatabase.createRecipe("Spicy Sausage Rice", 2, "");
+        stroppingDatabase.createRecipe("Pasta", 2, "");
     }
 
     public void mainFABClick(View view)
