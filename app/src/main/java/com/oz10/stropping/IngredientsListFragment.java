@@ -11,6 +11,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
+import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
 
 import java.util.ArrayList;
@@ -27,13 +28,13 @@ public class IngredientsListFragment extends Fragment {
     
     public void IngredientsListFragment()
     {
-        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
         _ingredientsList = stroppingDatabase.getAllIngredients();
     }
     
-    public void IngredientsListFragment(ArrayList<int> ingredientsToLoad)
+    public void IngredientsListFragment(ArrayList<Integer> ingredientsToLoad)
     {
-        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
         // TODO Create method to get certain ingredients (based on the list) from the database
     }
 
@@ -46,6 +47,10 @@ public class IngredientsListFragment extends Fragment {
         //_ingredientsList.add(new Ingredient("Apple", false));
         //_ingredientsList.add(new Ingredient("Pear", false));
         //_ingredientsList.add(new Ingredient("Snake", false));
+
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
+        stroppingDatabase.open();
+        _ingredientsList = stroppingDatabase.getAllIngredients();
 
         _ingredientsAdatper = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
 

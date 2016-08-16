@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.adapters.RecipeListAdapter;
+import com.adapters.database.StroppingDatabase;
 import com.classes.Recipe;
 
 import java.util.ArrayList;
@@ -31,10 +32,15 @@ public class RecipesFragment extends Fragment {
         RecyclerView recipes_RecyclerView = (RecyclerView)rootView.findViewById(R.id.recipes_recyclerview);
         recipes_RecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 2));
 
-        ArrayList<Recipe> recipeList = new ArrayList<>();
-        recipeList.add(new Recipe("Spag"));
-        recipeList.add(new Recipe("Spicy Sausage Rice"));
-        recipeList.add(new Recipe("Pasta"));
+//        ArrayList<Recipe> recipeList = new ArrayList<>();
+//        recipeList.add(new Recipe("Spag"));
+//        recipeList.add(new Recipe("Spicy Sausage Rice"));
+//        recipeList.add(new Recipe("Pasta"));
+
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
+        stroppingDatabase.open();
+
+        ArrayList<Recipe> recipeList = stroppingDatabase.getAllRecipes();
 
         _recipeListAdapter = new RecipeListAdapter(recipeList);
         recipes_RecyclerView.setAdapter(_recipeListAdapter);

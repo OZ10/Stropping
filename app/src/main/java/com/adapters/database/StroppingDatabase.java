@@ -112,6 +112,14 @@ public class StroppingDatabase {
         database.delete(tableName, null, null);
     }
 
+    public void ResetAllTables()
+    {
+        database.delete(DatabaseHelper.TABLE_INGREDIENTS,null,null);
+        database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS,null,null);
+        database.delete(DatabaseHelper.TABLE_RECIPES,null,null);
+        database.delete(DatabaseHelper.TABLE_SHOPPINGLIST,null,null);
+    }
+
     //Ingredients methods****************************************
     private String GetIngredientNameFromId(long ingredientId){
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS, ingredientsTableAllColumns,

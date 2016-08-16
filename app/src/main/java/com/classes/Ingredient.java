@@ -97,6 +97,7 @@ public class Ingredient extends BaseItem {
 
     public Ingredient()
     {
+        this.isSelected = false;
     }
 
     public Ingredient(String name, Boolean isSelected)

@@ -20,6 +20,7 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import com.adapters.RecipeListAdapter;
+import com.adapters.database.DatabaseHelper;
 import com.adapters.database.StroppingDatabase;
 import com.classes.Recipe;
 import com.roughike.bottombar.BottomBar;
@@ -110,6 +111,13 @@ public class MainActivity extends AppCompatActivity {
     private void SetupDatabase()
     {
         StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+        stroppingDatabase.open();
+
+        stroppingDatabase.ResetAllTables();
+
+        stroppingDatabase = new StroppingDatabase(this);
+        stroppingDatabase.open();
+
         stroppingDatabase.createIngredient("apple", "number of", 1, 1, 0, 0, 0, 0);
         stroppingDatabase.createIngredient("pear", "number of", 1, 1, 0, 0, 0, 0);
         stroppingDatabase.createIngredient("snake", "number of", 1, 1, 0, 0, 0, 0);
