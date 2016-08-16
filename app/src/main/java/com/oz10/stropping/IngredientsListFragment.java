@@ -24,6 +24,18 @@ public class IngredientsListFragment extends Fragment {
     ListView _ingredientsListView;
     ArrayAdapter<Ingredient> _ingredientsAdatper;
     Boolean _hasSelectedItems = false;
+    
+    public void IngredientsListFragment()
+    {
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+        _ingredientsList = stroppingDatabase.getAllIngredients();
+    }
+    
+    public void IngredientsListFragment(ArrayList<int> ingredientsToLoad)
+    {
+        StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+        // TODO Create method to get certain ingredients (based on the list) from the database
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -31,9 +43,9 @@ public class IngredientsListFragment extends Fragment {
         ViewGroup rootView = (ViewGroup) inflater.inflate(
                 R.layout.fragment_ingredients, container, false);
 
-        _ingredientsList.add(new Ingredient("Apple", false));
-        _ingredientsList.add(new Ingredient("Pear", false));
-        _ingredientsList.add(new Ingredient("Snake", false));
+        //_ingredientsList.add(new Ingredient("Apple", false));
+        //_ingredientsList.add(new Ingredient("Pear", false));
+        //_ingredientsList.add(new Ingredient("Snake", false));
 
         _ingredientsAdatper = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
 
