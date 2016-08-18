@@ -67,18 +67,19 @@ public class Recipe extends BaseItem {
 
     public Recipe()
     {
+        this.id = new Long(0);
         this.ingredients = new ArrayList<>();
     }
 
-    public Recipe(String name, ArrayList<Ingredient> ingredients)
-    {
-        this.name = name;
-        this.ingredients = ingredients;
-    }
+//    public Recipe(String name, ArrayList<Ingredient> ingredients)
+//    {
+//        this.name = name;
+//        this.ingredients = ingredients;
+//    }
 
-    public Recipe(String name)
-    {
-        this.name = name;
-        this.ingredients = new ArrayList<>();
-    }
+//    public Recipe(String name)
+//    {
+//        this.name = name;
+//        this.ingredients = new ArrayList<>();
+//    }
 }

@@ -34,6 +34,13 @@
                 android:layout_alignParentBottom="false">
 
                 <TextView
+                    android:id="@+id/recipe_id"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0"
+                    android:visibility="invisible"/>
+
+                <TextView
                     android:id="@+id/recipe_name"
                     android:layout_width="0dp"
                     android:layout_height="fill_parent"

@@ -1,22 +1,18 @@
 package com.oz10.stropping;
 
-import android.app.ListActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ListAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 
+import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
 import com.classes.Recipe;
 
@@ -28,6 +24,8 @@ import java.util.ArrayList;
 public class RecipeEditActivity extends AppCompatActivity {
 
     private EditText _recipeName;
+    private Recipe _recipe;
+    private ArrayAdapter<Ingredient> _ingredientArrayAdapter;
     ActionBar actionBar;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,31 +33,69 @@ public class RecipeEditActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_recipe_edit);
 
-        ActionBar actionBar = getSupportActionBar();
-        actionBar.setDisplayHomeAsUpEnabled(true);
+        SetupActionbar();
+
 //        actionBar.setDisplayOptions(ActionBar.DISPLAY_SHOW_CUSTOM);
-//        actionBar.setCustomView(R.menu.menu_edit_recipe);
+//        actionBar.setCustomView(R.menu.menu_ok_only);
 
 
         //TODO Set image
         _recipeName = (EditText)findViewById(R.id.recipe_name);
         ListView ingredientListView = (ListView)findViewById(R.id.recipe_ingredientslistView);
-        ArrayList<String> ingredientsList = new ArrayList();
+        ArrayList<Ingredient> ingredientsList = new ArrayList();
 
         Intent intent = getIntent();
         if (intent.getIntExtra("requestCode", 2) == 2){
-            // Load recipe details
-            _recipeName.setText(intent.getStringExtra("RecipeName"));
-            //TODO Pass in ingredient list
-//            ingredientsList = intent.getStringArrayListExtra("RecipeIngredients");
-//            ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, ingredientsList);
-//            ingredientListView.setAdapter(arrayAdapter);
+
+            long recipeId = intent.getLongExtra("RecipeId", 0);
+
+            StroppingDatabase stroppingDatabase = new StroppingDatabase(this);
+            stroppingDatabase.open();
+
+            _recipe = stroppingDatabase.getRecipeById(recipeId);
+
+            if (_recipe != null){
+                // Load recipe details
+                _recipeName.setText(_recipe.getName());
+
+                //TODO Pass in ingredient list
+                ingredientsList = stroppingDatabase.getRecipeIngredientsById(recipeId);
+                _ingredientArrayAdapter = new ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, ingredientsList);
+                ingredientListView.setAdapter(_ingredientArrayAdapter);
+            }
+
+            stroppingDatabase.close();
 
         }else{
             // New recipe
+            _recipe = new Recipe();
         }
+    }
 
+    private void SetupActionbar()
+    {
+        ActionBar actionBar = getSupportActionBar();
+        actionBar.setDisplayHomeAsUpEnabled(true);
+    }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (resultCode == RESULT_OK){
+            ArrayList<Long> ingredientIds = (ArrayList<Long>) data.getSerializableExtra("IngredientIds");
+
+            StroppingDatabase db = new StroppingDatabase(this);
+            db.open();
+
+            for (Long id:ingredientIds
+                 ) {
+                _ingredientArrayAdapter.add(db.getIngredientFromId(id));
+            }
+
+            _ingredientArrayAdapter.notifyDataSetChanged();
+
+            db.close();
+
+        }
     }
 
     public void EditRecipeFABClick(View view)
@@ -72,7 +108,7 @@ public class RecipeEditActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu_edit_recipe, menu);
+        inflater.inflate(R.menu.menu_ok_only, menu);
         return true;
     }
 
@@ -82,17 +118,47 @@ public class RecipeEditActivity extends AppCompatActivity {
             finish();
             return true;
         }
-        else if (item.getItemId() == R.id.action_recipe_ok){
-            //Recipe recipe = new Recipe((String)_recipeName.getText());
-            Intent returnIntent = new Intent();
+        else if (item.getItemId() == R.id.action_menu_ok){
+            // METHOD: Check if recipe has an id:
+            //      Yes: Recipe might have been updated. Push updates to the database
+            //      No : Create new recipe and push to database
 
-            String recipeName = _recipeName.getText().toString();
+            StroppingDatabase db = new StroppingDatabase(this);
+            db.open();
 
-            returnIntent.putExtra("RecipeName", recipeName);
-            setResult(RESULT_OK, returnIntent);
+            if (_recipe.getId() == 0){
+                // new recipe
+                //TODO Need to include properties serves & notes
+                _recipe = db.createRecipe(_recipeName.getText().toString(), 0, "");
+                db.addIngredientsToRecipe(_recipe.getId(), getIngredientsFromAdapter(_ingredientArrayAdapter));
+            }else{
+                db.updateRecipe(_recipe.getId(),_recipeName.getText().toString(), _recipe.getServes(), _recipe.getNotes(), getIngredientsFromAdapter(_ingredientArrayAdapter));
+            }
+
+//            Intent returnIntent = new Intent();
+//
+//            String recipeName = _recipeName.getText().toString();
+//
+//            returnIntent.putExtra("RecipeName", recipeName);
+//            setResult(RESULT_OK, returnIntent);
             finish();
+
+            db.close();
         }
 
         return true;
+    }
+
+    private ArrayList<Ingredient> getIngredientsFromAdapter(ArrayAdapter<Ingredient> ingredientsAdapter)
+    {
+        ArrayList<Ingredient> ingredients = new ArrayList<>();
+
+        if (ingredientsAdapter != null){
+            for (int i = 0; i < ingredientsAdapter.getCount(); i++){
+                ingredients.add(ingredientsAdapter.getItem(i));
+            }
+        }
+
+        return ingredients;
     }
 }

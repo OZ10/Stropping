@@ -26,17 +26,17 @@ public class IngredientsListFragment extends Fragment {
     ArrayAdapter<Ingredient> _ingredientsAdatper;
     Boolean _hasSelectedItems = false;
     
-    public void IngredientsListFragment()
-    {
-        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
-        _ingredientsList = stroppingDatabase.getAllIngredients();
-    }
-    
-    public void IngredientsListFragment(ArrayList<Integer> ingredientsToLoad)
-    {
-        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
-        // TODO Create method to get certain ingredients (based on the list) from the database
-    }
+//    public void IngredientsListFragment()
+//    {
+//        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
+//        _ingredientsList = stroppingDatabase.getAllIngredients();
+//    }
+//
+//    public void IngredientsListFragment(ArrayList<Integer> ingredientsToLoad)
+//    {
+//        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
+//        // TODO Create method to get certain ingredients (based on the list) from the database
+//    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -81,7 +81,7 @@ public class IngredientsListFragment extends Fragment {
         addButton.setImageResource(R.drawable.ic_playlist_add_white_24dp);
     }
 
-    public ArrayList<String> getSelectedIngredients()
+    public ArrayList<String> getSelectedIngredients_Names()
     {
         ArrayList<String> selectedIngredients = new ArrayList<>();
 
@@ -91,6 +91,24 @@ public class IngredientsListFragment extends Fragment {
                 selectedIngredients.add(ingredient.getName());
             }
         }
+
+        UnSelectAll();
+
+        return selectedIngredients;
+    }
+
+    public ArrayList<Long> getSelectedIngredients_Ids()
+    {
+        ArrayList<Long> selectedIngredients = new ArrayList<>();
+
+        for (Ingredient ingredient:_ingredientsList
+                ) {
+            if (ingredient.getIsSelected()) {
+                selectedIngredients.add(ingredient.getId());
+            }
+        }
+
+        //Long[] ids = selectedIngredients.toArray(new Long[selectedIngredients.size()]);
 
         UnSelectAll();
 

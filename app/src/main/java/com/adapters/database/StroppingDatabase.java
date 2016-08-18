@@ -5,6 +5,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
+import android.provider.ContactsContract;
 
 import com.classes.Ingredient;
 import com.classes.Recipe;
@@ -77,7 +78,7 @@ public class StroppingDatabase {
     private ShoppingListItem getShoppingListItem(Cursor cursor) {
         ShoppingListItem newShoppingListItem = new ShoppingListItem();
         newShoppingListItem.setId(cursor.getLong(0));
-        newShoppingListItem.setName(GetIngredientNameFromId(cursor.getLong(1)));
+        newShoppingListItem.setName(getIngredientNameFromId(cursor.getLong(1)));
         newShoppingListItem.setIngredientId(cursor.getLong(1));
         newShoppingListItem.setQuantity(cursor.getInt(2));
         newShoppingListItem.setPurchased(cursor.getInt(3));
@@ -121,7 +122,7 @@ public class StroppingDatabase {
     }
 
     //Ingredients methods****************************************
-    private String GetIngredientNameFromId(long ingredientId){
+    private String getIngredientNameFromId(long ingredientId){
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS, ingredientsTableAllColumns,
                 null, null, null, null, null);
 
@@ -138,7 +139,7 @@ public class StroppingDatabase {
         return null;
     }
 
-    public Ingredient GetIngredientFromId(long ingredientId){
+    public Ingredient getIngredientFromId(Long ingredientId){
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS, ingredientsTableAllColumns,
                 null, null, null, null, null);
 
@@ -183,7 +184,7 @@ public class StroppingDatabase {
                 + " = " + id, null);
     }
 
-    public void UpdateIngredient(long id, String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden){
+    public void updateIngredient(long id, String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, name);
         values.put(DatabaseHelper.COLUMN_UOM, uom);
@@ -251,13 +252,39 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_RECIPENOTES, notes);
         long insertId = database.insert(DatabaseHelper.TABLE_RECIPES, null,
                 values);
-        Cursor cursor = database.query(DatabaseHelper.TABLE_RECIPES,
-                RecipesAllColumns, DatabaseHelper.COLUMN_ID + " = " + insertId, null,
-                null, null, null);
+
+        Recipe recipe = getRecipeById(insertId);
+        return recipe;
+    }
+
+    public ArrayList<Ingredient> getRecipeIngredientsById(long id)
+    {
+        ArrayList<Ingredient> ingredientArrayList = new ArrayList<>();
+
+        Cursor cursor = database.query(DatabaseHelper.TABLE_RECIPEINGREDIENTS,
+                                        RecipeIngredientsAllColumns, DatabaseHelper.COLUMN_RECIPEID + "=" + id,
+                                        null, null, null, null);
         cursor.moveToFirst();
-        Recipe newRecipe = getRecipe(cursor);
+        while (!cursor.isAfterLast()){
+            Ingredient ingredient = getIngredientFromId(cursor.getLong(2));
+            ingredientArrayList.add(ingredient);
+            cursor.moveToNext();
+        }
         cursor.close();
-        return newRecipe;
+
+        return ingredientArrayList;
+    }
+
+    public Recipe getRecipeById(long id)
+    {
+        Cursor cursor = database.query(DatabaseHelper.TABLE_RECIPES,
+                RecipesAllColumns, DatabaseHelper.COLUMN_ID + " = " + id, null,
+                null, null, null);
+
+        cursor.moveToFirst();
+        Recipe recipe = getRecipe(cursor);
+        cursor.close();
+        return recipe;
     }
 
     private Recipe getRecipe(Cursor cursor) {
@@ -270,11 +297,48 @@ public class StroppingDatabase {
         return recipe;
     }
 
+    public void updateRecipe(long id, String name, int serves, String notes, ArrayList<Ingredient> ingredients){
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
+        values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
+        values.put(DatabaseHelper.COLUMN_RECIPENOTES, notes);
+        //TODO Does this update statement need the String.valueOf(id) statement?
+        database.update(DatabaseHelper.TABLE_RECIPES, values, DatabaseHelper.COLUMN_ID + " = ?",
+                new String[] { String.valueOf(id) });
+
+        addIngredientsToRecipe(id, ingredients);
+    }
+
     public void deleteRecipe(Recipe recipe){
         long id = recipe.getId();
         System.out.println("Recipe delete with id: " + id);
         database.delete(DatabaseHelper.TABLE_RECIPES, DatabaseHelper.COLUMN_ID
                 + " = " + id, null);
+    }
+
+    public void deleteAllIngredientsFromRecipe(long recipeId)
+    {
+        database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS, DatabaseHelper.COLUMN_RECIPEID + "=" + recipeId, null);
+    }
+
+    public void addIngredientsToRecipe(Long recipeId, ArrayList<Ingredient> ingredients)
+    {
+        // Save recipe's ingredients
+        // METHOD:  This might not be the best way to do this but...
+        //          First, delete all current recipe > ingredients rows
+        //          Add ingredients to recipe
+        //          Otherwise simply running update statements might
+        //          fail if the recipe is not already linked to the ingredient (i think)
+        deleteAllIngredientsFromRecipe(recipeId);
+
+        for (Ingredient ingredient:ingredients
+                ) {
+            ContentValues values = new ContentValues();
+            values.put(DatabaseHelper.COLUMN_INGREDIENTID, ingredient.getId().toString());
+            values.put(DatabaseHelper.COLUMN_RECIPEID, recipeId);
+            values.put(DatabaseHelper.COLUMN_QUANTITY, "0");
+            database.insert(DatabaseHelper.TABLE_RECIPEINGREDIENTS, null, values);
+        }
     }
 
     private CharSequence convertString(String convertString) {
