@@ -25,6 +25,9 @@ public class RecipeEditActivity extends AppCompatActivity {
 
     private EditText _recipeName;
     private Recipe _recipe;
+
+    private ArrayList<Ingredient> _ingredientsList;
+
     private ArrayAdapter<Ingredient> _ingredientArrayAdapter;
     ActionBar actionBar;
     @Override
@@ -41,8 +44,13 @@ public class RecipeEditActivity extends AppCompatActivity {
 
         //TODO Set image
         _recipeName = (EditText)findViewById(R.id.recipe_name);
+
+        //TODO  This section needs to be refactored. When a recipe is being loaded
+        //      the ingredients should be added to the adapter not a new list
         ListView ingredientListView = (ListView)findViewById(R.id.recipe_ingredientslistView);
-        ArrayList<Ingredient> ingredientsList = new ArrayList();
+        _ingredientsList = new ArrayList();
+        _ingredientArrayAdapter = new ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, _ingredientsList);
+        ingredientListView.setAdapter(_ingredientArrayAdapter);
 
         Intent intent = getIntent();
         if (intent.getIntExtra("requestCode", 2) == 2){
@@ -58,9 +66,8 @@ public class RecipeEditActivity extends AppCompatActivity {
                 // Load recipe details
                 _recipeName.setText(_recipe.getName());
 
-                //TODO Pass in ingredient list
-                ingredientsList = stroppingDatabase.getRecipeIngredientsById(recipeId);
-                _ingredientArrayAdapter = new ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, ingredientsList);
+                _ingredientsList = stroppingDatabase.getRecipeIngredientsById(recipeId);
+                _ingredientArrayAdapter = new ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, _ingredientsList);
                 ingredientListView.setAdapter(_ingredientArrayAdapter);
             }
 
@@ -88,13 +95,12 @@ public class RecipeEditActivity extends AppCompatActivity {
 
             for (Long id:ingredientIds
                  ) {
-                _ingredientArrayAdapter.add(db.getIngredientFromId(id));
+                    _ingredientArrayAdapter.add(db.getIngredientFromId(id));
             }
 
             _ingredientArrayAdapter.notifyDataSetChanged();
 
             db.close();
-
         }
     }
 

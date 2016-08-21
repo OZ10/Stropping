@@ -130,7 +130,7 @@ public class StroppingDatabase {
         while (!cursor.isAfterLast()){
             Ingredient ingredient = getIngredient(cursor);
             if (ingredient.getId() == ingredientId){
-                String name = ingredient.getName() + " " + Integer.toString(ingredient.getDefaultValue()) + convertString(ingredient.getUOM());
+                String name = ingredient.getName(); // + " " + Integer.toString(ingredient.getDefaultValue()) + convertString(ingredient.getUOM());
                 return name;
             }
             cursor.moveToNext();
@@ -146,7 +146,8 @@ public class StroppingDatabase {
         cursor.moveToFirst();
         while (!cursor.isAfterLast()){
             Ingredient ingredient = getIngredient(cursor);
-            if (ingredient.getId() == ingredientId){
+
+            if (ingredientId.equals((ingredient.getId()))){
                 return ingredient;
             }
             cursor.moveToNext();
@@ -254,6 +255,21 @@ public class StroppingDatabase {
                 values);
 
         Recipe recipe = getRecipeById(insertId);
+        return recipe;
+    }
+
+    public Recipe createRecipe(String name, int serves, String notes, ArrayList<Ingredient> recipeIngredients){
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
+        values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
+        values.put(DatabaseHelper.COLUMN_RECIPENOTES, notes);
+        long insertId = database.insert(DatabaseHelper.TABLE_RECIPES, null,
+                values);
+
+        Recipe recipe = getRecipeById(insertId);
+
+        addIngredientsToRecipe(recipe.getId(), recipeIngredients);
+
         return recipe;
     }
 

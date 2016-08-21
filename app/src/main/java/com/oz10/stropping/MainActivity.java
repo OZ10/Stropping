@@ -14,8 +14,9 @@ import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 
 import com.adapters.RecipeListAdapter;
+import com.adapters.ShoppingListAdapter;
 import com.adapters.database.StroppingDatabase;
-import com.classes.Recipe;
+import com.classes.Ingredient;
 import com.roughike.bottombar.BottomBar;
 import com.roughike.bottombar.OnMenuTabClickListener;
 
@@ -80,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
                         _pager.setCurrentItem(0);
                         _mainToolbar.setTitle(R.string.Toolbar_ShoppingList);
                         SetMainButtonIcon(0);
+                        RefreshShoppingList();
                         break;
                     case R.id.bottomBarItemTwo:
                         _pager.setCurrentItem(1);
@@ -111,12 +113,19 @@ public class MainActivity extends AppCompatActivity {
         stroppingDatabase = new StroppingDatabase(this);
         stroppingDatabase.open();
 
-        stroppingDatabase.createIngredient("Apple", "number of", 1, 1, 0, 0, 0, 0);
-        stroppingDatabase.createIngredient("Pear", "number of", 1, 1, 0, 0, 0, 0);
-        stroppingDatabase.createIngredient("Snake", "number of", 1, 1, 0, 0, 0, 0);
+        ArrayList<Ingredient> ingredientArrayList = new ArrayList<>();
+
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Red Pepper", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Garlic", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Red Onion", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Parsley", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Small Tomato", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Salad Onions", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Brown Rice", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Chicken Stock cube", "number of", 1, 1, 0, 0, 0, 0));
         
         stroppingDatabase.createRecipe("Spag", 2, "");
-        stroppingDatabase.createRecipe("Spicy Sausage Rice", 2, "");
+        stroppingDatabase.createRecipe("Spicy Sausage Rice", 2, "", ingredientArrayList);
         stroppingDatabase.createRecipe("Pasta", 2, "");
     }
 
@@ -160,26 +169,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addIngredients_Click(IngredientsListFragment ingredientsFrag) {
-        //TODO Move all this code to the ingredients fragment
-        ArrayList<String> selectedIngredients = ingredientsFrag.getSelectedIngredients_Names();
-
-        if (selectedIngredients.size() != 0){
-            // Add ingredients to shopping list
-            ShoppingListFragment shoppingListFrag = (ShoppingListFragment) _pagerAdapter.GetFragmentByIndex(0);
-
-            ArrayAdapter<String> shoppingListAdapter = shoppingListFrag.ShoppingListAdapter;
-
-            for (String selectedIngredient:selectedIngredients) {
-                shoppingListAdapter.add(selectedIngredient);
-            }
-            shoppingListAdapter.notifyDataSetChanged();
-
-            SelectBottombarTab(0);
-        }
-        else
-        {
-            //TODO Open the add ingredients activity
-        }
+        int tabToSelect = ingredientsFrag.addSelectedIngredientsToShoppingList();
+        SelectBottombarTab(tabToSelect);
     }
 
     private void SelectBottombarTab(int button)
@@ -191,12 +182,24 @@ public class MainActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();  // Always call the superclass method first
 
+        RefreshShoppingList();
+
+        //TODO Refactor this
         RecipesFragment recipesFragment = (RecipesFragment) _pagerAdapter.GetFragmentByIndex(2);
 
         // Reload all recipes from database to see changes
         if (recipesFragment != null){
             RecipeListAdapter recipeListAdapter = recipesFragment._recipeListAdapter;
             recipeListAdapter.updateAdapterFromDatabase(this);
+        }
+    }
+
+    private void RefreshShoppingList() {
+        ShoppingListFragment shoppingListFragment = (ShoppingListFragment) _pagerAdapter.GetFragmentByIndex(0);
+        // Reload all shoppingList item from database to see changes
+        if (shoppingListFragment != null){
+            ShoppingListAdapter shoppingListAdapter = shoppingListFragment._shoppingListAdapter;
+            shoppingListAdapter.updateAdapterFromDatabase(this);
         }
     }
 

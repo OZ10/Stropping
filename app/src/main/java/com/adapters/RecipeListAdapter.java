@@ -2,17 +2,21 @@ package com.adapters;
 
 import android.content.Context;
 import android.content.Intent;
+import android.support.design.widget.Snackbar;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.adapters.database.StroppingDatabase;
+import com.classes.Ingredient;
 import com.classes.Recipe;
 import com.oz10.stropping.R;
 import com.oz10.stropping.RecipeEditActivity;
+import com.oz10.stropping.ShoppingListFragment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,20 +30,41 @@ public class RecipeListAdapter extends RecyclerView.Adapter<RecipeListAdapter.Re
         CardView cardView;
         TextView recipeId;
         TextView recipeName;
+        Button addToShoppingListButton;
 
         RecipeViewHolder(View view){
             super(view);
             cardView = (CardView)view.findViewById(R.id.recipe_card_view);
             recipeId = (TextView)view.findViewById(R.id.recipe_id);
             recipeName = (TextView)view.findViewById(R.id.recipe_name);
+            addToShoppingListButton = (Button)view.findViewById(R.id.recipe_addButton);
 
             cardView.setOnClickListener(new View.OnClickListener(){
                 @Override public void onClick(View view){
-                    //TODO Open Edit Recipes activity
                     Intent intent = new Intent(cardView.getContext(), RecipeEditActivity.class);
                     intent.putExtra("RecipeId", Long.parseLong(recipeId.getText().toString()));
                     intent.putExtra("requestCode", 2);
                     cardView.getContext().startActivity(intent);
+                }
+            });
+
+            addToShoppingListButton.setOnClickListener(new View.OnClickListener(){
+                @Override public void onClick(View view){
+                    StroppingDatabase db = new StroppingDatabase(view.getContext());
+                    db.open();
+
+                    ArrayList<Ingredient> ingredients = db.getRecipeIngredientsById(Long.parseLong(recipeId.getText().toString()));
+                    for (Ingredient ingredient:ingredients
+                         ) {
+                        db.createShoppingListItem(ingredient.getId(), 1, 0);
+                    }
+
+                    db.close();
+
+                    String message = (ingredients.size() > 0) ? ingredients.size() + " ingredients added to shopping list" : "no ingredients associated with recipe";
+
+                    Snackbar snackbar = Snackbar.make(view, message , Snackbar.LENGTH_SHORT);
+                    snackbar.show();
                 }
             });
         }

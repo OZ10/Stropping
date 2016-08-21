@@ -81,6 +81,22 @@ public class IngredientsListFragment extends Fragment {
         addButton.setImageResource(R.drawable.ic_playlist_add_white_24dp);
     }
 
+    public ArrayList<Ingredient> getSelectedIngredients()
+    {
+        ArrayList<Ingredient> selectedIngredients = new ArrayList<>();
+
+        for (Ingredient ingredient:_ingredientsList
+                ) {
+            if (ingredient.getIsSelected()) {
+                selectedIngredients.add(ingredient);
+            }
+        }
+
+        UnSelectAll();
+
+        return selectedIngredients;
+    }
+
     public ArrayList<String> getSelectedIngredients_Names()
     {
         ArrayList<String> selectedIngredients = new ArrayList<>();
@@ -128,5 +144,30 @@ public class IngredientsListFragment extends Fragment {
 
         _ingredientsAdatper.notifyDataSetChanged();
         _ingredientsListView.clearChoices();
+    }
+
+    public int addSelectedIngredientsToShoppingList()
+    {
+        ArrayList<Ingredient> selectedIngredients = getSelectedIngredients();
+
+        if (selectedIngredients.size() != 0){
+
+            StroppingDatabase db = new StroppingDatabase(getContext());
+            db.open();
+
+            for (Ingredient ingredient:selectedIngredients
+                 ) {
+                db.createShoppingListItem(ingredient.getId(), 1, 0);
+            }
+
+            db.close();
+
+            return 0;
+        }
+        else
+        {
+            //TODO Open the add ingredients activity
+            return (1);
+        }
     }
 }
