@@ -39,8 +39,7 @@ public class ShoppingListAdapter extends ArrayAdapter {
         View view = convertView;
 
         if (view == null){
-            LayoutInflater layoutInflater;
-            layoutInflater = LayoutInflater.from(getContext());
+            LayoutInflater layoutInflater = LayoutInflater.from(getContext());
             view = layoutInflater.inflate(R.layout.item_shoppinglist, null);
         }
 

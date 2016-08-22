@@ -118,10 +118,10 @@ public class MainActivity extends AppCompatActivity {
         ingredientArrayList.add(stroppingDatabase.createIngredient("Red Pepper", "number of", 1, 1, 0, 0, 0, 0));
         ingredientArrayList.add(stroppingDatabase.createIngredient("Garlic", "number of", 1, 1, 0, 0, 0, 0));
         ingredientArrayList.add(stroppingDatabase.createIngredient("Red Onion", "number of", 1, 1, 0, 0, 0, 0));
-        ingredientArrayList.add(stroppingDatabase.createIngredient("Parsley", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Parsley", "grams", 10, 10, 0, 0, 0, 0));
         ingredientArrayList.add(stroppingDatabase.createIngredient("Small Tomato", "number of", 1, 1, 0, 0, 0, 0));
-        ingredientArrayList.add(stroppingDatabase.createIngredient("Salad Onions", "number of", 1, 1, 0, 0, 0, 0));
-        ingredientArrayList.add(stroppingDatabase.createIngredient("Brown Rice", "number of", 1, 1, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Salad Onions", "number of", 6, 6, 0, 0, 0, 0));
+        ingredientArrayList.add(stroppingDatabase.createIngredient("Brown Rice", "grams", 250, 250, 0, 0, 0, 0));
         ingredientArrayList.add(stroppingDatabase.createIngredient("Chicken Stock cube", "number of", 1, 1, 0, 0, 0, 0));
         
         stroppingDatabase.createRecipe("Spag", 2, "");
@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
         }
         else{
             IngredientsListFragment ingredientsListFragment = (IngredientsListFragment) _pagerAdapter.GetFragmentByIndex(1);
-            if (ingredientsListFragment._selectedIngredientsList.size() > 0){
+            if (ingredientsListFragment._ingredientsAdatper._selectedIngredientsList.size() > 0){
                 _mainButton.setImageResource(R.drawable.ic_playlist_add_white_24dp);
             }
         }

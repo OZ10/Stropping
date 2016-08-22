@@ -9,8 +9,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.ListView;
 
+import com.adapters.IngredientListAdapter;
 import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
 
@@ -22,9 +24,9 @@ import java.util.ArrayList;
 public class IngredientsListFragment extends Fragment {
 
     ArrayList<Ingredient> _ingredientsList = new ArrayList<>();
-    ArrayList<Ingredient> _selectedIngredientsList = new ArrayList<>();
+    //ArrayList<Ingredient> _selectedIngredientsList = new ArrayList<>();
     ListView _ingredientsListView;
-    ArrayAdapter<Ingredient> _ingredientsAdatper;
+    IngredientListAdapter _ingredientsAdatper;
     //Boolean _hasSelectedItems = false;
     
     @Override
@@ -38,29 +40,29 @@ public class IngredientsListFragment extends Fragment {
         _ingredientsList = db.getAllIngredients();
         db.close();
 
-        _ingredientsAdatper = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
+        _ingredientsAdatper = new IngredientListAdapter(getContext(), R.layout.item_ingredient, _ingredientsList);
 
         _ingredientsListView = (ListView) rootView.findViewById(R.id.ingredientslistView);
         _ingredientsListView.setAdapter(_ingredientsAdatper);
 
-        _ingredientsListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
-        {
-            @Override
-            public void onItemClick(AdapterView<?> parent, final View view,
-                                    int position, long id)
-            {
-                Ingredient selectedIngredient = (Ingredient) parent.getItemAtPosition(position);
-                selectedIngredient.setIsSelected();
-
-                if (selectedIngredient.getIsSelected()){
-                    _selectedIngredientsList.add(selectedIngredient);
-                }else{
-                    _selectedIngredientsList.remove(selectedIngredient);
-                }
-
-                //ChangeAddIngredientButton();
-            }
-        });
+//        _ingredientsListView.setOnItemClickListener(new AdapterView.OnItemClickListener()
+//        {
+//            @Override
+//            public void onItemClick(AdapterView<?> parent, final View view,
+//                                    int position, long id)
+//            {
+//                Ingredient selectedIngredient = (Ingredient) parent.getItemAtPosition(position);
+//                selectedIngredient.setIsSelected();
+//
+//                if (selectedIngredient.getIsSelected()){
+//                    _selectedIngredientsList.add(selectedIngredient);
+//                }else{
+//                    _selectedIngredientsList.remove(selectedIngredient);
+//                }
+//
+//                //ChangeAddIngredientButton();
+//            }
+//        });
 
         return rootView;
     }
@@ -125,7 +127,7 @@ public class IngredientsListFragment extends Fragment {
     {
         //_hasSelectedItems = false;
 
-        _selectedIngredientsList.clear();
+        _ingredientsAdatper._selectedIngredientsList.clear();
 
         for (Ingredient ingredient : _ingredientsList
              ) {
@@ -136,28 +138,40 @@ public class IngredientsListFragment extends Fragment {
 
         _ingredientsAdatper.notifyDataSetChanged();
         _ingredientsListView.clearChoices();
+
+        //uncheckAllChildrenCascade(_ingredientsListView);
     }
 
-    public int addSelectedIngredientsToShoppingList()
-    {
+//    private void uncheckAllChildrenCascade(ViewGroup vg) {
+//        for (int i = 0; i < vg.getChildCount(); i++) {
+//            View v = vg.getChildAt(i);
+//            if (v instanceof CheckBox) {
+//                ((CheckBox) v).setChecked(false);
+//            } else if (v instanceof ViewGroup) {
+//                uncheckAllChildrenCascade((ViewGroup) v);
+//            }
+//        }
+//    }
+
+    public int addSelectedIngredientsToShoppingList() {
         //ArrayList<Ingredient> selectedIngredients = getSelectedIngredients();
 
-        if (_selectedIngredientsList.size() != 0){
+        if (_ingredientsAdatper._selectedIngredientsList.size() != 0) {
 
             StroppingDatabase db = new StroppingDatabase(getContext());
             db.open();
 
-            for (Ingredient ingredient:_selectedIngredientsList
-                 ) {
+            for (Ingredient ingredient : _ingredientsAdatper._selectedIngredientsList
+                    ) {
                 db.createShoppingListItem(ingredient.getId(), 1, 0);
             }
 
             db.close();
 
+            UnSelectAll();
+
             return 0;
-        }
-        else
-        {
+        } else {
             //TODO Open the add ingredients activity
             return (1);
         }
