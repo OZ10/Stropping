@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
         }
         else{
             IngredientsListFragment ingredientsListFragment = (IngredientsListFragment) _pagerAdapter.GetFragmentByIndex(1);
-            if (ingredientsListFragment._hasSelectedItems){
+            if (ingredientsListFragment._selectedIngredientsList.size() > 0){
                 _mainButton.setImageResource(R.drawable.ic_playlist_add_white_24dp);
             }
         }
@@ -184,14 +184,7 @@ public class MainActivity extends AppCompatActivity {
 
         RefreshShoppingList();
 
-        //TODO Refactor this
-        RecipesFragment recipesFragment = (RecipesFragment) _pagerAdapter.GetFragmentByIndex(2);
-
-        // Reload all recipes from database to see changes
-        if (recipesFragment != null){
-            RecipeListAdapter recipeListAdapter = recipesFragment._recipeListAdapter;
-            recipeListAdapter.updateAdapterFromDatabase(this);
-        }
+        RefreshRecipes();
     }
 
     private void RefreshShoppingList() {
@@ -202,20 +195,15 @@ public class MainActivity extends AppCompatActivity {
             shoppingListAdapter.updateAdapterFromDatabase(this);
         }
     }
+    
+    private void RefreshRecipes() {
+        RecipesFragment recipesFragment = (RecipesFragment) _pagerAdapter.GetFragmentByIndex(2);
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-
-//        if (requestCode == ADDNEW_RECIPE_REQUEST) {
-//            if(resultCode == RESULT_OK){
-//                //TODO This needs to be refactored
-//                RecipesFragment recipesFragment = (RecipesFragment) _pagerAdapter.GetFragmentByIndex(2);
-//                RecipeListAdapter recipeListAdapter = recipesFragment._recipeListAdapter;
-//                String recipeName = data.getStringExtra("RecipeName");
-//                recipeListAdapter.add(new Recipe(recipeName));
-//                recipeListAdapter.notifyDataSetChanged();
-//            }
-//        }
+        // Reload all recipes from database to see changes
+        if (recipesFragment != null){
+            RecipeListAdapter recipeListAdapter = recipesFragment._recipeListAdapter;
+            recipeListAdapter.updateAdapterFromDatabase(this);
+        }
     }
 
     // DEFAULT 'MY FIRST APP' CODE
