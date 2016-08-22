@@ -22,35 +22,21 @@ import java.util.ArrayList;
 public class IngredientsListFragment extends Fragment {
 
     ArrayList<Ingredient> _ingredientsList = new ArrayList<>();
+    ArrayList<Ingredient> _selectedIngredientsList = new ArrayList<>();
     ListView _ingredientsListView;
     ArrayAdapter<Ingredient> _ingredientsAdatper;
-    Boolean _hasSelectedItems = false;
+    //Boolean _hasSelectedItems = false;
     
-//    public void IngredientsListFragment()
-//    {
-//        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
-//        _ingredientsList = stroppingDatabase.getAllIngredients();
-//    }
-//
-//    public void IngredientsListFragment(ArrayList<Integer> ingredientsToLoad)
-//    {
-//        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
-//        // TODO Create method to get certain ingredients (based on the list) from the database
-//    }
-
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         ViewGroup rootView = (ViewGroup) inflater.inflate(
                 R.layout.fragment_ingredients, container, false);
 
-        //_ingredientsList.add(new Ingredient("Apple", false));
-        //_ingredientsList.add(new Ingredient("Pear", false));
-        //_ingredientsList.add(new Ingredient("Snake", false));
-
-        StroppingDatabase stroppingDatabase = new StroppingDatabase(getContext());
-        stroppingDatabase.open();
-        _ingredientsList = stroppingDatabase.getAllIngredients();
+        StroppingDatabase db = new StroppingDatabase(getContext());
+        db.open();
+        _ingredientsList = db.getAllIngredients();
+        db.close();
 
         _ingredientsAdatper = new ArrayAdapter<Ingredient>(getContext(), android.R.layout.simple_list_item_multiple_choice, _ingredientsList);
 
@@ -66,7 +52,11 @@ public class IngredientsListFragment extends Fragment {
                 Ingredient selectedIngredient = (Ingredient) parent.getItemAtPosition(position);
                 selectedIngredient.setIsSelected();
 
-                if (selectedIngredient.getIsSelected()) _hasSelectedItems = true;
+                if (selectedIngredient.getIsSelected()){
+                    _selectedIngredientsList.add(selectedIngredient);
+                }else{
+                    _selectedIngredientsList.remove(selectedIngredient);
+                }
 
                 //ChangeAddIngredientButton();
             }
@@ -133,7 +123,9 @@ public class IngredientsListFragment extends Fragment {
 
     private void UnSelectAll()
     {
-        _hasSelectedItems = false;
+        //_hasSelectedItems = false;
+
+        _selectedIngredientsList.clear();
 
         for (Ingredient ingredient : _ingredientsList
              ) {
@@ -148,14 +140,14 @@ public class IngredientsListFragment extends Fragment {
 
     public int addSelectedIngredientsToShoppingList()
     {
-        ArrayList<Ingredient> selectedIngredients = getSelectedIngredients();
+        //ArrayList<Ingredient> selectedIngredients = getSelectedIngredients();
 
-        if (selectedIngredients.size() != 0){
+        if (_selectedIngredientsList.size() != 0){
 
             StroppingDatabase db = new StroppingDatabase(getContext());
             db.open();
 
-            for (Ingredient ingredient:selectedIngredients
+            for (Ingredient ingredient:_selectedIngredientsList
                  ) {
                 db.createShoppingListItem(ingredient.getId(), 1, 0);
             }
