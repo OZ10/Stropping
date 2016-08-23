@@ -36,7 +36,31 @@ public class ShoppingListFragment extends Fragment {
         _shoppingListAdapter = new ShoppingListAdapter(getContext(), android.R.layout.simple_list_item_1, IngredientsList);
         ListView lv = (ListView) rootView.findViewById(R.id.shoppingListView);
         lv.setAdapter(_shoppingListAdapter);
+        
+        // This might need to be in the onCreate method
+        setHasOptionsMenu(true);
 
         return rootView;
+    }
+    
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater menuInflater = getMenuInflater();
+        menuInflater.inflate(R.menu.menu_shoppinglist, menu);
+        return true;
+    }
+
+    public boolean onOptionsItemSelected(MenuItem item){
+        if (item.getItemId() == R.id.action_menu_clear){
+            StroppingDatabase db = new StroppingDatabase(getContext());
+            db.open();
+            db.DeleteAllRowsFromTable(DatabaseHelper.TABLE_SHOPPINGLIST);
+            db.close();
+            
+            //TOOD Maybe just clear the adapters list and notify at this point? Below method opens the database, queries etc
+            _shoppingListAdapter.updateAdapterFromDatabase(getContext());
+        }
+
+        return true;
     }
 }
