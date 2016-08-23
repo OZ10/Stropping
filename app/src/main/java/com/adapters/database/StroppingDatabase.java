@@ -12,6 +12,8 @@ import com.classes.Recipe;
 import com.classes.ShoppingListItem;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * Created by Austen on 15/08/2016.
@@ -62,10 +64,11 @@ public class StroppingDatabase {
     public ShoppingListItem createShoppingListItem(long ingredientId, int quantity, int isPurchased){
         
         // Check if ingredient has already been added to the shopping list
-        ShoppingListItem shoppingListItem = getShoppingListItemByIngredientId(ingredientId)
+        ShoppingListItem shoppingListItem = getShoppingListItemByIngredientId(ingredientId);
         
         if (shoppingListItem != null){
             shoppingListItem.setQuantity(shoppingListItem.getQuantity() + quantity);
+            updateShoppingListItem(shoppingListItem);
         }else{
             ContentValues values = new ContentValues();
             values.put(DatabaseHelper.COLUMN_INGREDIENTID, ingredientId);
@@ -99,9 +102,9 @@ public class StroppingDatabase {
         ShoppingListItem shoppingListItem = null;
         
         Cursor cursor = database.query(DatabaseHelper.TABLE_SHOPPINGLIST,
-                shoppingListTableAllColumns, DatabaseHelper.COLUMN_ID + " = " + ingredientId, null,
+                shoppingListTableAllColumns, DatabaseHelper.COLUMN_INGREDIENTID + " = " + ingredientId, null,
                 null, null, null);
-        if (cursor.moveToFirst(){
+        if (cursor.moveToFirst()){
             shoppingListItem = getShoppingListItem(cursor);
         }
         
@@ -125,7 +128,7 @@ public class StroppingDatabase {
         return shoppingListItems;
     }
 
-    public void UpdateShoppingListItem(ShoppingListItem shoppingListItem){
+    public void updateShoppingListItem(ShoppingListItem shoppingListItem){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTID, shoppingListItem.getIngredientId());
         values.put(DatabaseHelper.COLUMN_QUANTITY, shoppingListItem.getQuantity());

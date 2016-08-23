@@ -42,9 +42,9 @@ public class IngredientListAdapter extends ArrayAdapter {
         final Ingredient ingredient = _ingredientsList.get(position);
 
         if (ingredient != null){
-            SetIngredientName(view, ingredient.getName());
+            SetIngredientName(view, ingredient.getName(), parent);
 
-            SetIngredientQuantity(view, ingredient.getQuantityText());
+            SetIngredientQuantity(view, ingredient.getQuantityText(), parent);
 
             SetIngredientIsSelected(view, ingredient);
         }
@@ -52,14 +52,14 @@ public class IngredientListAdapter extends ArrayAdapter {
         return view;
     }
     
-    private void SetIngredientName(View view, String ingredientName)
+    private void SetIngredientName(View view, final String ingredientName, final ViewGroup parent)
     {
         TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
             textView.setOnClickListener(new View.OnClickListener(){
                     @Override
                     public void onClick(View view) {
                         //TODO Open Edit ingredient activity
-                        Snackbar snackbar = Snackbar.make(parent, ingredient.getName() + " clicked!", Snackbar.LENGTH_SHORT);
+                        Snackbar snackbar = Snackbar.make(parent, ingredientName + " clicked!", Snackbar.LENGTH_SHORT);
                         snackbar.show();
                     }
                 }
@@ -67,15 +67,14 @@ public class IngredientListAdapter extends ArrayAdapter {
             textView.setText(ingredientName);
     }
     
-    private void SetIngredientQuantity(View view, String ingredientQuantity)
+    private void SetIngredientQuantity(View view, final String ingredientQuantity, final ViewGroup parent)
     {
         TextView textView = (TextView) view.findViewById(R.id.ingredient_quantity);
             textView.setOnClickListener(new View.OnClickListener(){
                                             @Override
                                             public void onClick(View view) {
                                                 //TODO Open Edit ingredient activity
-                                                String quantity = Integer.toString(ingredient.getQuantity());
-                                                Snackbar snackbar = Snackbar.make(parent, quantity + " required!", Snackbar.LENGTH_SHORT);
+                                                Snackbar snackbar = Snackbar.make(parent, ingredientQuantity + " required!", Snackbar.LENGTH_SHORT);
                                                 snackbar.show();
                                             }
                                         }
@@ -83,7 +82,7 @@ public class IngredientListAdapter extends ArrayAdapter {
             textView.setText(ingredientQuantity);
     }
 
-    private void SetIngredientIsSelected(View view, Ingredient ingredient)
+    private void SetIngredientIsSelected(View view, final Ingredient ingredient)
     {
         CheckBox checkBox = (CheckBox) view.findViewById(R.id.ingredient_isselected);
             checkBox.setOnClickListener(new View.OnClickListener(){

@@ -53,16 +53,16 @@ public class ShoppingListAdapter extends ArrayAdapter {
         return view;
     }
     
-    private void SetShoppingListItemName(View view, ShoppingListItem as shoppingListItem)
+    private void SetShoppingListItemName(View view, ShoppingListItem shoppingListItem)
     {
         TextView textView = (TextView) view.findViewById(R.id.shoppinglistitem_name);
         textView.setText(shoppingListItem.getName());
     }
     
-    private void SetShoppingListItemQuantity(View view, ShoppingListItem as shoppingListItem)
+    private void SetShoppingListItemQuantity(View view, ShoppingListItem shoppingListItem)
     {
         TextView textView = (TextView) view.findViewById(R.id.shoppinglistitem_quantity);
-        textView.setText(shoppingListItem.getQuantityText());
+        textView.setText(Integer.toString(shoppingListItem.getQuantity()));
     }
 
     public void updateAdapterFromDatabase(Context context)

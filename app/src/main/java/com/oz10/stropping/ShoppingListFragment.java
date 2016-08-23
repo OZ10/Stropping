@@ -3,12 +3,17 @@ package com.oz10.stropping;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import com.adapters.ShoppingListAdapter;
+import com.adapters.database.DatabaseHelper;
+import com.adapters.database.StroppingDatabase;
 
 import java.util.ArrayList;
 
@@ -42,12 +47,10 @@ public class ShoppingListFragment extends Fragment {
 
         return rootView;
     }
-    
+
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater menuInflater = getMenuInflater();
-        menuInflater.inflate(R.menu.menu_shoppinglist, menu);
-        return true;
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_shoppinglist, menu);
     }
 
     public boolean onOptionsItemSelected(MenuItem item){
