@@ -41,9 +41,20 @@ public class IngredientListAdapter extends ArrayAdapter {
 
         final Ingredient ingredient = _ingredientsList.get(position);
 
-        //TODO Refactor
         if (ingredient != null){
-            TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
+            SetIngredientName(view, ingredient.getName());
+
+            SetIngredientQuantity(view, ingredient.getQuantityText());
+
+            SetIngredientIsSelected(view, ingredient);
+        }
+
+        return view;
+    }
+    
+    private void SetIngredientName(View view, String ingredientName)
+    {
+        TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
             textView.setOnClickListener(new View.OnClickListener(){
                     @Override
                     public void onClick(View view) {
@@ -53,10 +64,13 @@ public class IngredientListAdapter extends ArrayAdapter {
                     }
                 }
             );
-            textView.setText(ingredient.getName());
-
-            TextView textView2 = (TextView) view.findViewById(R.id.ingredient_quantity);
-            textView2.setOnClickListener(new View.OnClickListener(){
+            textView.setText(ingredientName);
+    }
+    
+    private void SetIngredientQuantity(View view, String ingredientQuantity)
+    {
+        TextView textView = (TextView) view.findViewById(R.id.ingredient_quantity);
+            textView.setOnClickListener(new View.OnClickListener(){
                                             @Override
                                             public void onClick(View view) {
                                                 //TODO Open Edit ingredient activity
@@ -66,9 +80,12 @@ public class IngredientListAdapter extends ArrayAdapter {
                                             }
                                         }
             );
-            textView2.setText(ingredient.getQuantityText());
+            textView.setText(ingredientQuantity);
+    }
 
-            CheckBox checkBox = (CheckBox) view.findViewById(R.id.ingredient_isselected);
+    private void SetIngredientIsSelected(View view, Ingredient ingredient)
+    {
+        CheckBox checkBox = (CheckBox) view.findViewById(R.id.ingredient_isselected);
             checkBox.setOnClickListener(new View.OnClickListener(){
                     @Override
                     public void onClick(View view) {
@@ -84,10 +101,6 @@ public class IngredientListAdapter extends ArrayAdapter {
                 }
             );
             checkBox.setChecked(ingredient.getIsSelected());
-        }
-
-        return view;
     }
-
 
 }
