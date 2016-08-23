@@ -60,19 +60,28 @@ public class StroppingDatabase {
 
     //ShoppingList methods****************************************
     public ShoppingListItem createShoppingListItem(long ingredientId, int quantity, int isPurchased){
-        ContentValues values = new ContentValues();
-        values.put(DatabaseHelper.COLUMN_INGREDIENTID, ingredientId);
-        values.put(DatabaseHelper.COLUMN_QUANTITY, quantity);
-        values.put(DatabaseHelper.COLUMN_PURCHASED, isPurchased);
-        long insertId = database.insert(DatabaseHelper.TABLE_SHOPPINGLIST, null, values);
-
-        Cursor cursor = database.query(DatabaseHelper.TABLE_SHOPPINGLIST,
-                shoppingListTableAllColumns, DatabaseHelper.COLUMN_ID + " = " + insertId, null,
-                null, null, null);
-        cursor.moveToFirst();
-        ShoppingListItem newShoppingListItem = getShoppingListItem(cursor);
-        cursor.close();
-        return newShoppingListItem;
+        
+        // Check if ingredient has already been added to the shopping list
+        ShoppingListItem shoppingListItem = getShoppingListItemByIngredientId(ingredientId)
+        
+        if (shoppingListItem != null){
+            shoppingListItem.setQuantity(shoppingListItem.getQuantity() + quantity);
+        }else{
+            ContentValues values = new ContentValues();
+            values.put(DatabaseHelper.COLUMN_INGREDIENTID, ingredientId);
+            values.put(DatabaseHelper.COLUMN_QUANTITY, quantity);
+            values.put(DatabaseHelper.COLUMN_PURCHASED, isPurchased);
+            long insertId = database.insert(DatabaseHelper.TABLE_SHOPPINGLIST, null, values);
+    
+            Cursor cursor = database.query(DatabaseHelper.TABLE_SHOPPINGLIST,
+                    shoppingListTableAllColumns, DatabaseHelper.COLUMN_ID + " = " + insertId, null,
+                    null, null, null);
+            cursor.moveToFirst();
+            shoppingListItem = getShoppingListItem(cursor);
+            cursor.close();
+        }
+        
+        return shoppingListItem;
     }
 
     private ShoppingListItem getShoppingListItem(Cursor cursor) {
@@ -83,6 +92,22 @@ public class StroppingDatabase {
         newShoppingListItem.setQuantity(cursor.getInt(2));
         newShoppingListItem.setPurchased(cursor.getInt(3));
         return newShoppingListItem;
+    }
+    
+    private ShoppingListItem getShoppingListItemByIngredientId(long ingredientId) {
+        
+        ShoppingListItem shoppingListItem = null;
+        
+        Cursor cursor = database.query(DatabaseHelper.TABLE_SHOPPINGLIST,
+                shoppingListTableAllColumns, DatabaseHelper.COLUMN_ID + " = " + ingredientId, null,
+                null, null, null);
+        if (cursor.moveToFirst(){
+            shoppingListItem = getShoppingListItem(cursor);
+        }
+        
+        cursor.close();
+        
+        return shoppingListItem;
     }
 
     //Creates a list of all shoppinglist items in the db
