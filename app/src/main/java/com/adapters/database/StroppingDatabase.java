@@ -236,6 +236,16 @@ public class StroppingDatabase {
             cursor.moveToNext();
         }
         cursor.close();
+        
+        // Sort list
+        //TODO Make this a generic call that can be used by any method
+        Collections.sort(ingredients, new Comparator<Ingredient>(){
+           @Override
+           public int compare(Ingredient i1, Ingredient i2){
+               return i1.getName().compareToIgnoreCase(i2.getName());
+           }
+        });
+        
         return ingredients;
     }
 
