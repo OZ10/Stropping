@@ -62,7 +62,7 @@ public class ShoppingListAdapter extends ArrayAdapter {
     private void SetShoppingListItemQuantity(View view, ShoppingListItem shoppingListItem)
     {
         TextView textView = (TextView) view.findViewById(R.id.shoppinglistitem_quantity);
-        textView.setText(Integer.toString(shoppingListItem.getQuantity()));
+        textView.setText(shoppingListItem.getQuantityText());
     }
 
     public void updateAdapterFromDatabase(Context context)
