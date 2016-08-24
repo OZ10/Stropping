@@ -12,6 +12,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
 
+import com.adapters.ShoppingListAdapter;
 import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
 import com.classes.Recipe;
@@ -28,7 +29,7 @@ public class RecipeEditActivity extends AppCompatActivity {
 
     private ArrayList<Ingredient> _ingredientsList;
 
-    private ArrayAdapter<Ingredient> _ingredientArrayAdapter;
+    private ShoppingListAdapter _ingredientArrayAdapter;
     ActionBar actionBar;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +50,7 @@ public class RecipeEditActivity extends AppCompatActivity {
         //      the ingredients should be added to the adapter not a new list
         ListView ingredientListView = (ListView)findViewById(R.id.recipe_ingredientslistView);
         _ingredientsList = new ArrayList();
-        _ingredientArrayAdapter = new ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, _ingredientsList);
+        _ingredientArrayAdapter = new ShoppingListAdapter(this, android.R.layout.simple_list_item_1, _ingredientsList);
         ingredientListView.setAdapter(_ingredientArrayAdapter);
 
         Intent intent = getIntent();
@@ -67,7 +68,7 @@ public class RecipeEditActivity extends AppCompatActivity {
                 _recipeName.setText(_recipe.getName());
 
                 _ingredientsList = stroppingDatabase.getRecipeIngredientsById(recipeId);
-                _ingredientArrayAdapter = new ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, _ingredientsList);
+                _ingredientArrayAdapter = new ShoppingListAdapter(this, android.R.layout.simple_list_item_1, _ingredientsList);
                 ingredientListView.setAdapter(_ingredientArrayAdapter);
             }
 

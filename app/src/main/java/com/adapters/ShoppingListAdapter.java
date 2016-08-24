@@ -10,6 +10,7 @@ import android.widget.TextView;
 
 import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
+import com.classes.QuantityItem;
 import com.classes.Recipe;
 import com.classes.ShoppingListItem;
 import com.oz10.stropping.R;
@@ -25,12 +26,12 @@ import java.util.List;
 
 public class ShoppingListAdapter extends ArrayAdapter {
 
-    public ArrayList<ShoppingListItem> _shoppingListItems;
+    public ArrayList<QuantityItem> _shoppingListItems;
 
     public ShoppingListAdapter(Context context, int resource, List objects) {
         super(context, resource, objects);
 
-        _shoppingListItems = (ArrayList<ShoppingListItem>) objects;
+        _shoppingListItems = (ArrayList<QuantityItem>) objects;
     }
 
     @Override
@@ -43,7 +44,7 @@ public class ShoppingListAdapter extends ArrayAdapter {
             view = layoutInflater.inflate(R.layout.item_shoppinglist, null);
         }
 
-        ShoppingListItem shoppingListItem = _shoppingListItems.get(position);
+        QuantityItem shoppingListItem = _shoppingListItems.get(position);
 
         if (shoppingListItem != null){
             SetShoppingListItemName(view, shoppingListItem);
@@ -53,13 +54,13 @@ public class ShoppingListAdapter extends ArrayAdapter {
         return view;
     }
     
-    private void SetShoppingListItemName(View view, ShoppingListItem shoppingListItem)
+    private void SetShoppingListItemName(View view, QuantityItem shoppingListItem)
     {
         TextView textView = (TextView) view.findViewById(R.id.shoppinglistitem_name);
         textView.setText(shoppingListItem.getName());
     }
     
-    private void SetShoppingListItemQuantity(View view, ShoppingListItem shoppingListItem)
+    private void SetShoppingListItemQuantity(View view, QuantityItem shoppingListItem)
     {
         TextView textView = (TextView) view.findViewById(R.id.shoppinglistitem_quantity);
         textView.setText(shoppingListItem.getQuantityText());

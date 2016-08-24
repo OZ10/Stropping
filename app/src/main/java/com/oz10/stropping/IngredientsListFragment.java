@@ -163,7 +163,7 @@ public class IngredientsListFragment extends Fragment {
 
             for (Ingredient ingredient : _ingredientsAdatper._selectedIngredientsList
                     ) {
-                db.createShoppingListItem(ingredient.getId(), 1, 0);
+                db.createShoppingListItem(ingredient.getId(), ingredient.getQuantity(), 0);
             }
 
             db.close();

@@ -56,7 +56,7 @@ public class RecipeListAdapter extends RecyclerView.Adapter<RecipeListAdapter.Re
                     ArrayList<Ingredient> ingredients = db.getRecipeIngredientsById(Long.parseLong(recipeId.getText().toString()));
                     for (Ingredient ingredient:ingredients
                          ) {
-                        db.createShoppingListItem(ingredient.getId(), 1, 0);
+                        db.createShoppingListItem(ingredient.getId(), ingredient.getQuantity(), 0);
                     }
 
                     db.close();
