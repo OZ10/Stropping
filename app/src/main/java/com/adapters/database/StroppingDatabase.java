@@ -94,6 +94,13 @@ public class StroppingDatabase {
         newShoppingListItem.setIngredientId(cursor.getLong(1));
         newShoppingListItem.setQuantity(cursor.getInt(2));
         newShoppingListItem.setPurchased(cursor.getInt(3));
+        
+        // Get UOM from ingredient
+        Ingredient ingredient = getIngredientFromId(newShoppingListItem.getIngredientId());
+        if (ingredient != null){
+            newShoppingListItem.setUOM(ingredient.getUOM);
+        }
+        
         return newShoppingListItem;
     }
     
