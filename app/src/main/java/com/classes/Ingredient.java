@@ -3,27 +3,16 @@ package com.classes;
 /**
  * Created by Austen on 01/08/2016.
  */
-public class Ingredient extends BaseItem {
+public class Ingredient extends QuantityItem {
 
-    private String uom;
     private int defaultValue;
     private boolean favourite;
     private boolean essential;
-    private int quantity;
-    private String quantityText;
     private boolean added;
     private boolean hidden = false;
     private Boolean isSelected;
 
-    public String getUOM(){
-        return uom;
-    }
-
-    public void setUOM(String uom){
-        this.uom = uom;
-    }
-
-    public int getDefaultValue(){
+   public int getDefaultValue(){
         return defaultValue;
     }
 
@@ -47,24 +36,7 @@ public class Ingredient extends BaseItem {
         this.essential = ReturnBoolean(essential);
     }
 
-    public int getQuantity(){
-        return quantity;
-    }
-
-    public void setQuantity(int quantity){
-        this.quantity = quantity;
-        this.setQuantityText(convertUOM(getUOM()));
-    }
-
-    public String getQuantityText(){
-        return quantityText;
-    }
-
-    private void setQuantityText(String quantityText){
-        this.quantityText = quantityText;
-    }
-
-    public boolean getAdded(){
+   public boolean getAdded(){
         return added;
     }
 
@@ -114,30 +86,5 @@ public class Ingredient extends BaseItem {
     {
         this.name = name;
         this.isSelected = isSelected;
-    }
-
-    private String convertUOM(String uom) {
-
-        String quantity = Integer.toString(getQuantity());
-
-        if (uom.equals("number of")) {
-            return "x" + quantity;
-        }
-        else if (uom.equals("grams")) {
-            return quantity + "g";
-        }
-        else if (uom.equals("kilograms")) {
-            return quantity + "kg";
-        }
-        else if (uom.equals("liters")) {
-            return quantity + "l";
-        }
-        else if (uom.equals("milliliters")) {
-            return quantity + "ml";
-        }
-        else if (uom.equals("pints")) {
-            return quantity + "pt";
-        }
-        return uom;
     }
 }
