@@ -3,9 +3,8 @@ package com.classes;
 /**
  * Created by Austen on 15/08/2016.
  */
-public class ShoppingListItem extends BaseItem {
+public class ShoppingListItem extends QuantityItem {
     private Long ingredientId;
-    private int quantity;
     private boolean purchased = false;
 
     public Long getIngredientId(){
@@ -14,14 +13,6 @@ public class ShoppingListItem extends BaseItem {
 
     public void setIngredientId(Long ingredientId){
         this.ingredientId = ingredientId;
-    }
-
-    public int getQuantity(){
-        return quantity;
-    }
-
-    public void setQuantity(int quantity){
-        this.quantity = quantity;
     }
 
     public boolean getPurchased(){
