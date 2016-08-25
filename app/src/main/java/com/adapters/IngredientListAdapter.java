@@ -1,6 +1,7 @@
 package com.adapters;
 
 import android.content.Context;
+import android.content.Intent;
 import android.support.design.widget.Snackbar;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,6 +11,7 @@ import android.widget.CheckBox;
 import android.widget.TextView;
 
 import com.classes.Ingredient;
+import com.oz10.stropping.IngredientEditActivity;
 import com.oz10.stropping.R;
 
 import java.util.ArrayList;
@@ -42,7 +44,7 @@ public class IngredientListAdapter extends ArrayAdapter {
         final Ingredient ingredient = _ingredientsList.get(position);
 
         if (ingredient != null){
-            SetIngredientName(view, ingredient.getName(), parent);
+            SetIngredientName(view, ingredient.getName(), ingredient.getId(), parent);
 
             SetIngredientQuantity(view, ingredient.getQuantityText(), parent);
 
@@ -52,15 +54,18 @@ public class IngredientListAdapter extends ArrayAdapter {
         return view;
     }
     
-    private void SetIngredientName(View view, final String ingredientName, final ViewGroup parent)
+    private void SetIngredientName(View view, final String ingredientName, final Long ingredientId, final ViewGroup parent)
     {
         TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
             textView.setOnClickListener(new View.OnClickListener(){
                     @Override
                     public void onClick(View view) {
                         //TODO Open Edit ingredient activity
-                        Snackbar snackbar = Snackbar.make(parent, ingredientName + " clicked!", Snackbar.LENGTH_SHORT);
-                        snackbar.show();
+//                        Snackbar snackbar = Snackbar.make(parent, ingredientName + " clicked!", Snackbar.LENGTH_SHORT);
+//                        snackbar.show();
+                        Intent intent = new Intent(getContext(), IngredientEditActivity.class);
+                        intent.putExtra("IngredientId", ingredientId);
+                        getContext().startActivity(intent);
                     }
                 }
             );

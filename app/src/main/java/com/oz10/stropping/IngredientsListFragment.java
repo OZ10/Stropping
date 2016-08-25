@@ -172,7 +172,8 @@ public class IngredientsListFragment extends Fragment {
 
             return 0;
         } else {
-            //TODO Open the add ingredients activity
+            Intent intent = new Intent(getContext(), IngredientEditActivity.class);
+            getContext().startActivity(intent);
             return (1);
         }
     }
