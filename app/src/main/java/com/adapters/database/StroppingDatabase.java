@@ -331,6 +331,8 @@ public class StroppingDatabase {
         cursor.moveToFirst();
         while (!cursor.isAfterLast()){
             Ingredient ingredient = getIngredientFromId(cursor.getLong(2));
+            // Set quantity from recipe-ingredients table
+            ingredient.setQuantity(cursor.getInt(3));
             ingredientArrayList.add(ingredient);
             cursor.moveToNext();
         }
