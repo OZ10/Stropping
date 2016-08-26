@@ -19,6 +19,13 @@ import com.classes.Ingredient;
 
 public class IngredientEditActivity extends AppCompatActivity {
 
+    Spinner _uomSpinner;
+    Ingredient _ingredient;
+    EditText _ingredientName;
+    EditText _quantity;
+    Swtich _favourite;
+    Swtich _essential
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -34,20 +41,44 @@ public class IngredientEditActivity extends AppCompatActivity {
                 StroppingDatabase db = new StroppingDatabase(this);
                 db.open();
 
-                Ingredient ingredient = db.getIngredientFromId(ingredientId);
-                EditText ingredientName = (EditText) findViewById(R.id.ingredient_edit_name);
-                ingredientName.setText(ingredient.getName());
+                _ingredient = db.getIngredientFromId(ingredientId);
+                _ingredientName = (EditText) findViewById(R.id.ingredient_edit_name);
+                _ingredientName.setText(_ingredient.getName());
 
-//                EditText defaultValue = (EditText) findViewById(R.id.ingredient_edit_defaultvalue_value);
-//                defaultValue.setText(ingredient.getDefaultValue());
-//
-//                EditText quantity = (EditText) findViewById(R.id.ingredient_edit_quantity_value);
-//                quantity.setText(ingredient.getQuantity());
+                _quantity = (EditText) findViewById(R.id.ingredient_edit_quantity_value);
+                _quantity.setText(String.valueof(_ingredient.getQuantity()));
+                
+                SetupUOMSpinner();
+                
+                _favourite = (Switch) findViewById(R.id.ingredient_edit_favourite);
+                _favourite.setChecked(_ingredient.getFavourite);
+                _essential = (Switch) findViewById(R.id.ingredient_edit_essential);
+                _essential.setChecked(_ingredient.getEssential);
 
                 db.close();
+            } else {
+                _ingredient = new Ingredient();
             }
 
         }
+    }
+    
+    private void SetupUOMSpinner()
+    {
+        List<String> uomList = new ArrayList<String();
+        uomList.add("number of");
+        uomList.add("grams");
+        uomList.add("kilograms");
+        uomList.add("liters");
+        uomList.add("milliliters");
+        uomList.add("pints");
+        
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, uomList)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        
+        _uomSpinner = (Spinner) findViewById(R.id.ingredient_edit_uom);
+        _uomSpinner.setAdapter(adapter);
+        
     }
 
     private void SetupActionbar()
@@ -64,13 +95,31 @@ public class IngredientEditActivity extends AppCompatActivity {
     }
 
     public boolean onOptionsItemSelected(MenuItem item){
-        //TODO Refactor
         if (item.getItemId() == android.R.id.home){
             finish();
             return true;
         }
         else if (item.getItemId() == R.id.action_menu_ok){
+            
+            String name = _ingredientName.getText().toString();
+            String uom = String.valueOf(_uomSpinner.getSelectedItem();
+            int quantity = int.valueOf(_quantity.getText();
+            int isFavourite = (_favourite.getChecked()) ? 1 : 0;
+            int isEssential = (_essential.getChecked()) ? 1 : 0;
+        
+            StroppingDatabase db = new StroppingDatabase(this);
+            db.open();
+
+            if (_ingredient.getId() == 0){
+                // new ingredient
+                _ingredient = db.createIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+            }else{
+                db.updateIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+            }
+
             finish();
+
+            db.close();
         }
 
         return true;
