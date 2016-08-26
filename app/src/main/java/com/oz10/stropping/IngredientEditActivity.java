@@ -33,6 +33,12 @@ public class IngredientEditActivity extends AppCompatActivity {
 
         SetupActionbar();
 
+        _ingredientName = (EditText) findViewById(R.id.ingredient_edit_name);
+        _quantity = (EditText) findViewById(R.id.ingredient_edit_quantity_value);
+        SetupUOMSpinner();
+        _favourite = (Switch) findViewById(R.id.ingredient_edit_favourite);
+        _essential = (Switch) findViewById(R.id.ingredient_edit_essential);
+
         Intent intent = getIntent();
         if (intent != null){
             Long ingredientId = intent.getLongExtra("IngredientId", 0);
@@ -42,17 +48,13 @@ public class IngredientEditActivity extends AppCompatActivity {
                 db.open();
 
                 _ingredient = db.getIngredientFromId(ingredientId);
-                _ingredientName = (EditText) findViewById(R.id.ingredient_edit_name);
+                
                 _ingredientName.setText(_ingredient.getName());
-
-                _quantity = (EditText) findViewById(R.id.ingredient_edit_quantity_value);
                 _quantity.setText(String.valueof(_ingredient.getQuantity()));
                 
-                SetupUOMSpinner();
+                //_uomSpinner.setSelection(index);
                 
-                _favourite = (Switch) findViewById(R.id.ingredient_edit_favourite);
                 _favourite.setChecked(_ingredient.getFavourite);
-                _essential = (Switch) findViewById(R.id.ingredient_edit_essential);
                 _essential.setChecked(_ingredient.getEssential);
 
                 db.close();
@@ -65,6 +67,7 @@ public class IngredientEditActivity extends AppCompatActivity {
     
     private void SetupUOMSpinner()
     {
+        //TODO Load these values from db
         List<String> uomList = new ArrayList<String();
         uomList.add("number of");
         uomList.add("grams");
@@ -114,7 +117,7 @@ public class IngredientEditActivity extends AppCompatActivity {
                 // new ingredient
                 _ingredient = db.createIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
             }else{
-                db.updateIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+                db.updateIngredient(_ingredient.getId(), name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
             }
 
             finish();
