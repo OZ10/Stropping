@@ -402,7 +402,7 @@ public class StroppingDatabase {
             ContentValues values = new ContentValues();
             values.put(DatabaseHelper.COLUMN_INGREDIENTID, ingredient.getId().toString());
             values.put(DatabaseHelper.COLUMN_RECIPEID, recipeId);
-            values.put(DatabaseHelper.COLUMN_QUANTITY, "0");
+            values.put(DatabaseHelper.COLUMN_QUANTITY, ingredient.getQuantity());
             database.insert(DatabaseHelper.TABLE_RECIPEINGREDIENTS, null, values);
         }
     }
