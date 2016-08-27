@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.provider.ContactsContract;
 
 import com.classes.Ingredient;
+import com.classes.QuantityItem;
 import com.classes.Recipe;
 import com.classes.ShoppingListItem;
 
@@ -306,7 +307,7 @@ public class StroppingDatabase {
         return recipe;
     }
 
-    public Recipe createRecipe(String name, int serves, String notes, ArrayList<Ingredient> recipeIngredients){
+    public Recipe createRecipe(String name, int serves, String notes, ArrayList<QuantityItem> recipeIngredients){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
         values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
@@ -363,7 +364,7 @@ public class StroppingDatabase {
         return recipe;
     }
 
-    public void updateRecipe(long id, String name, int serves, String notes, ArrayList<Ingredient> ingredients){
+    public void updateRecipe(long id, String name, int serves, String notes, ArrayList<QuantityItem> ingredients){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
         values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
@@ -387,7 +388,7 @@ public class StroppingDatabase {
         database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS, DatabaseHelper.COLUMN_RECIPEID + "=" + recipeId, null);
     }
 
-    public void addIngredientsToRecipe(Long recipeId, ArrayList<Ingredient> ingredients)
+    public void addIngredientsToRecipe(Long recipeId, ArrayList<QuantityItem> ingredients)
     {
         // Save recipe's ingredients
         // METHOD:  This might not be the best way to do this but...
@@ -397,7 +398,7 @@ public class StroppingDatabase {
         //          fail if the recipe is not already linked to the ingredient (i think)
         deleteAllIngredientsFromRecipe(recipeId);
 
-        for (Ingredient ingredient:ingredients
+        for (QuantityItem ingredient:ingredients
                 ) {
             ContentValues values = new ContentValues();
             values.put(DatabaseHelper.COLUMN_INGREDIENTID, ingredient.getId().toString());

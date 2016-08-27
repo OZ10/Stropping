@@ -6,7 +6,7 @@
     android:descendantFocusability="blocksDescendants"
      >
     
-    <TextView android:id="@+id/shoppinglistitem_name"
+    <TextView android:id="@+id/ingredient_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceListItemSmall"
@@ -19,7 +19,7 @@
         />
     
     <TextView
-        android:id="@+id/shoppinglistitem_quantity"
+        android:id="@+id/ingredient_quantity"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/textview_rounded"

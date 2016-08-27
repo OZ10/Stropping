@@ -11,11 +11,17 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class IngredientEditActivity extends AppCompatActivity {
 
@@ -23,8 +29,8 @@ public class IngredientEditActivity extends AppCompatActivity {
     Ingredient _ingredient;
     EditText _ingredientName;
     EditText _quantity;
-    Swtich _favourite;
-    Swtich _essential
+    Switch _favourite;
+    Switch _essential;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,8 +42,8 @@ public class IngredientEditActivity extends AppCompatActivity {
         _ingredientName = (EditText) findViewById(R.id.ingredient_edit_name);
         _quantity = (EditText) findViewById(R.id.ingredient_edit_quantity_value);
         SetupUOMSpinner();
-        _favourite = (Switch) findViewById(R.id.ingredient_edit_favourite);
-        _essential = (Switch) findViewById(R.id.ingredient_edit_essential);
+        _favourite = (Switch) findViewById(R.id.ingredient_edit_favourite_value);
+        _essential = (Switch) findViewById(R.id.ingredient_edit_essential_value);
 
         Intent intent = getIntent();
         if (intent != null){
@@ -50,12 +56,12 @@ public class IngredientEditActivity extends AppCompatActivity {
                 _ingredient = db.getIngredientFromId(ingredientId);
                 
                 _ingredientName.setText(_ingredient.getName());
-                _quantity.setText(String.valueof(_ingredient.getQuantity()));
+                _quantity.setText(String.valueOf(_ingredient.getQuantity()));
                 
                 //_uomSpinner.setSelection(index);
                 
-                _favourite.setChecked(_ingredient.getFavourite);
-                _essential.setChecked(_ingredient.getEssential);
+                _favourite.setChecked(_ingredient.getFavourite());
+                _essential.setChecked(_ingredient.getEssential());
 
                 db.close();
             } else {
@@ -68,7 +74,7 @@ public class IngredientEditActivity extends AppCompatActivity {
     private void SetupUOMSpinner()
     {
         //TODO Load these values from db
-        List<String> uomList = new ArrayList<String();
+        List<String> uomList = new ArrayList<String>();
         uomList.add("number of");
         uomList.add("grams");
         uomList.add("kilograms");
@@ -76,10 +82,10 @@ public class IngredientEditActivity extends AppCompatActivity {
         uomList.add("milliliters");
         uomList.add("pints");
         
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, uomList)
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, uomList);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         
-        _uomSpinner = (Spinner) findViewById(R.id.ingredient_edit_uom);
+        _uomSpinner = (Spinner) findViewById(R.id.ingredient_edit_uom_value);
         _uomSpinner.setAdapter(adapter);
         
     }
@@ -93,36 +99,52 @@ public class IngredientEditActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu_ok_only, menu);
+        inflater.inflate(R.menu.menu_ok_delete, menu);
         return true;
     }
 
     public boolean onOptionsItemSelected(MenuItem item){
-        if (item.getItemId() == android.R.id.home){
-            finish();
-            return true;
-        }
-        else if (item.getItemId() == R.id.action_menu_ok){
-            
-            String name = _ingredientName.getText().toString();
-            String uom = String.valueOf(_uomSpinner.getSelectedItem();
-            int quantity = int.valueOf(_quantity.getText();
-            int isFavourite = (_favourite.getChecked()) ? 1 : 0;
-            int isEssential = (_essential.getChecked()) ? 1 : 0;
-        
-            StroppingDatabase db = new StroppingDatabase(this);
-            db.open();
+        switch (item.getItemId())
+        {
+            case android.R.id.home:
+                finish();
+                break;
 
-            if (_ingredient.getId() == 0){
-                // new ingredient
-                _ingredient = db.createIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
-            }else{
-                db.updateIngredient(_ingredient.getId(), name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
-            }
+            case R.id.action_menu_delete:
+                StroppingDatabase db = new StroppingDatabase(this);
+                db.open();
 
-            finish();
+                if (_ingredient.getId() != 0){
+                    db.deleteIngredient(_ingredient);
+                }
 
-            db.close();
+                finish();
+
+                db.close();
+                break;
+
+            case R.id.action_menu_ok:
+                String name = _ingredientName.getText().toString();
+                String uom = String.valueOf(_uomSpinner.getSelectedItem());
+                int quantity = Integer.valueOf(_quantity.getText().toString());
+
+                int isFavourite = 0; //(_favourite.getChecked()) ? 1 : 0;
+                int isEssential = 0; //(_essential.getChecked()) ? 1 : 0;
+
+                db = new StroppingDatabase(this);
+                db.open();
+
+                if (_ingredient.getId() == 0){
+                    // new ingredient
+                    _ingredient = db.createIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+                }else{
+                    db.updateIngredient(_ingredient.getId(), name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+                }
+
+                finish();
+
+                db.close();
+                break;
         }
 
         return true;

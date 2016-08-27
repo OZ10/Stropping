@@ -79,11 +79,13 @@ public class Ingredient extends QuantityItem {
 
     public Ingredient()
     {
+        this.id = new Long(0);
         this.isSelected = false;
     }
 
     public Ingredient(String name, Boolean isSelected)
     {
+        this.id = new Long(0);
         this.name = name;
         this.isSelected = isSelected;
     }

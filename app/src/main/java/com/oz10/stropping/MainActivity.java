@@ -12,10 +12,11 @@ import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.adapters.IngredientListAdapter;
 import com.adapters.RecipeListAdapter;
-import com.adapters.ShoppingListAdapter;
 import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
+import com.classes.QuantityItem;
 import com.roughike.bottombar.BottomBar;
 import com.roughike.bottombar.OnMenuTabClickListener;
 
@@ -156,7 +157,7 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();  // Always call the superclass method first
 
         RefreshShoppingList();
-
+        RefreshIngedientsList();
         RefreshRecipes();
     }
 
@@ -164,8 +165,17 @@ public class MainActivity extends AppCompatActivity {
         ShoppingListFragment shoppingListFragment = (ShoppingListFragment) _pagerAdapter.GetFragmentByIndex(0);
         // Reload all shoppingList item from database to see changes
         if (shoppingListFragment != null){
-            ShoppingListAdapter shoppingListAdapter = shoppingListFragment._shoppingListAdapter;
+            IngredientListAdapter shoppingListAdapter = shoppingListFragment._shoppingListAdapter;
             shoppingListAdapter.updateAdapterFromDatabase(this);
+        }
+    }
+
+    private void RefreshIngedientsList() {
+        IngredientsListFragment ingredientsListFragment = (IngredientsListFragment) _pagerAdapter.GetFragmentByIndex(1);
+
+        if (ingredientsListFragment != null){
+            IngredientListAdapter ingredientsListAdapter = ingredientsListFragment._ingredientsAdatper;
+            ingredientsListAdapter.updateAdapterFromDatabase(this);
         }
     }
     
@@ -189,15 +199,15 @@ public class MainActivity extends AppCompatActivity {
         db = new StroppingDatabase(this);
         db.open();
 
-        ArrayList<Ingredient> ingredientArrayList = new ArrayList<>();
+        ArrayList<QuantityItem> ingredientArrayList = new ArrayList<>();
 
         Ingredient i_RedPepper = db.createIngredient("Red Pepper", "number of", 1, 1, 0, 0, 0, 0);
         Ingredient i_Garlic = db.createIngredient("Garlic", "number of", 1, 1, 0, 0, 0, 0);
         Ingredient i_RedOnion = db.createIngredient("Red Onion", "number of", 1, 1, 0, 0, 0, 0);
-        Ingredient i_Parsley = db.createIngredient(("Parsley", "grams", 10, 10, 0, 0, 0, 0);
+        Ingredient i_Parsley = db.createIngredient("Parsley", "grams", 10, 10, 0, 0, 0, 0);
         Ingredient i_SmallTomato = db.createIngredient("Small Tomato", "number of", 1, 1, 0, 0, 0, 0);
         Ingredient i_SaladOnions = db.createIngredient("Salad Onions", "number of", 6, 6, 0, 0, 0, 0);
-        Ingredient i_Brown Rice = db.createIngredient("Brown Rice", "grams", 500, 500, 0, 0, 0, 0);
+        Ingredient i_BrownRice = db.createIngredient("Brown Rice", "grams", 500, 500, 0, 0, 0, 0);
         Ingredient i_ChickenSC = db.createIngredient("Chicken Stock cube", "number of", 1, 1, 0, 0, 0, 0);
         Ingredient i_Sausages = db.createIngredient("Turkey Sausages", "number of", 8, 8, 0, 0, 0, 0);
 
@@ -207,7 +217,7 @@ public class MainActivity extends AppCompatActivity {
         ingredientArrayList.add(i_Parsley);
         ingredientArrayList.add(i_SmallTomato);
         ingredientArrayList.add(i_SaladOnions);
-        ingredientArrayList.add(i_Brown);
+        ingredientArrayList.add(i_BrownRice);
         ingredientArrayList.add(i_ChickenSC);
         ingredientArrayList.add(i_Sausages);
         db.createRecipe("Spicy Sausage Rice", 2, "", ingredientArrayList);
@@ -218,7 +228,6 @@ public class MainActivity extends AppCompatActivity {
         Ingredient i_Mince = db.createIngredient("Turkey Mince", "grams", 500, 500, 0, 0, 0, 0);
         Ingredient i_ChoppedToms = db.createIngredient("Chopped Tomatoes", "grams", 250, 250, 0, 0, 0, 0);
         Ingredient i_Spag = db.createIngredient("Spag", "grams", 200, 200, 0, 0, 0, 0);
-        Ingredient i_Carrot = db.createIngredient("Carrot", "number of", 1, 1, 0, 0, 0, 0);
         Ingredient i_Carrot = db.createIngredient("Carrot", "number of", 1, 1, 0, 0, 0, 0);
         Ingredient i_Celery = db.createIngredient("Celery", "number of", 1, 1, 0, 0, 0, 0);
         

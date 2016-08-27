@@ -8,10 +8,9 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
-import com.adapters.ShoppingListAdapter;
+import com.adapters.IngredientListAdapter;
 import com.adapters.database.DatabaseHelper;
 import com.adapters.database.StroppingDatabase;
 
@@ -23,8 +22,7 @@ import java.util.ArrayList;
 public class ShoppingListFragment extends Fragment {
 
     private ArrayList<String> IngredientsList = new ArrayList<>();
-    //public ArrayAdapter _shoppingListAdapter;
-    public ShoppingListAdapter _shoppingListAdapter;
+        public IngredientListAdapter _shoppingListAdapter;
 
     @Override
     public void onResume() {
@@ -37,8 +35,8 @@ public class ShoppingListFragment extends Fragment {
         ViewGroup rootView = (ViewGroup) inflater.inflate(
                 R.layout.fragment_shopping_list, container, false);
 
-        //_shoppingListAdapter = new ArrayAdapter(getContext(), android.R.layout.simple_list_item_1, IngredientsList);
-        _shoppingListAdapter = new ShoppingListAdapter(getContext(), android.R.layout.simple_list_item_1, IngredientsList);
+        //_shoppingListAdapter = new ShoppingListAdapter(getContext(), android.R.layout.simple_list_item_1, IngredientsList);
+        _shoppingListAdapter = new IngredientListAdapter(getContext(), IngredientsList, R.layout.item_shoppinglist, IngredientListAdapter.type.shoppinglist);
         ListView lv = (ListView) rootView.findViewById(R.id.shoppingListView);
         lv.setAdapter(_shoppingListAdapter);
         

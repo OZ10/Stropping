@@ -12,9 +12,10 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
 
-import com.adapters.ShoppingListAdapter;
+import com.adapters.IngredientListAdapter;
 import com.adapters.database.StroppingDatabase;
 import com.classes.Ingredient;
+import com.classes.QuantityItem;
 import com.classes.Recipe;
 
 import java.util.ArrayList;
@@ -26,10 +27,10 @@ public class RecipeEditActivity extends AppCompatActivity {
 
     private EditText _recipeName;
     private Recipe _recipe;
+    private IngredientListAdapter _ingredientArrayAdapter;
 
     private ArrayList<Ingredient> _ingredientsList;
 
-    private ShoppingListAdapter _ingredientArrayAdapter;
     ActionBar actionBar;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,10 +40,6 @@ public class RecipeEditActivity extends AppCompatActivity {
 
         SetupActionbar();
 
-//        actionBar.setDisplayOptions(ActionBar.DISPLAY_SHOW_CUSTOM);
-//        actionBar.setCustomView(R.menu.menu_ok_only);
-
-
         //TODO Set image
         _recipeName = (EditText)findViewById(R.id.recipe_name);
 
@@ -50,7 +47,7 @@ public class RecipeEditActivity extends AppCompatActivity {
         //      the ingredients should be added to the adapter not a new list
         ListView ingredientListView = (ListView)findViewById(R.id.recipe_ingredientslistView);
         _ingredientsList = new ArrayList();
-        _ingredientArrayAdapter = new ShoppingListAdapter(this, android.R.layout.simple_list_item_1, _ingredientsList);
+        _ingredientArrayAdapter = new IngredientListAdapter(this, _ingredientsList, R.layout.item_shoppinglist, IngredientListAdapter.type.editrecipe);
         ingredientListView.setAdapter(_ingredientArrayAdapter);
 
         Intent intent = getIntent();
@@ -68,7 +65,7 @@ public class RecipeEditActivity extends AppCompatActivity {
                 _recipeName.setText(_recipe.getName());
 
                 _ingredientsList = stroppingDatabase.getRecipeIngredientsById(recipeId);
-                _ingredientArrayAdapter = new ShoppingListAdapter(this, android.R.layout.simple_list_item_1, _ingredientsList);
+                _ingredientArrayAdapter = new IngredientListAdapter(this, _ingredientsList, R.layout.item_shoppinglist, IngredientListAdapter.type.editrecipe);
                 ingredientListView.setAdapter(_ingredientArrayAdapter);
             }
 
@@ -137,17 +134,11 @@ public class RecipeEditActivity extends AppCompatActivity {
                 // new recipe
                 //TODO Need to include properties serves & notes
                 _recipe = db.createRecipe(_recipeName.getText().toString(), 0, "");
-                db.addIngredientsToRecipe(_recipe.getId(), getIngredientsFromAdapter(_ingredientArrayAdapter));
+                db.addIngredientsToRecipe(_recipe.getId(), _ingredientArrayAdapter._ingredientsList); // getIngredientsFromAdapter(_ingredientArrayAdapter));
             }else{
-                db.updateRecipe(_recipe.getId(),_recipeName.getText().toString(), _recipe.getServes(), _recipe.getNotes(), getIngredientsFromAdapter(_ingredientArrayAdapter));
+                db.updateRecipe(_recipe.getId(),_recipeName.getText().toString(), _recipe.getServes(), _recipe.getNotes(), _ingredientArrayAdapter._ingredientsList); // getIngredientsFromAdapter(_ingredientArrayAdapter));
             }
 
-//            Intent returnIntent = new Intent();
-//
-//            String recipeName = _recipeName.getText().toString();
-//
-//            returnIntent.putExtra("RecipeName", recipeName);
-//            setResult(RESULT_OK, returnIntent);
             finish();
 
             db.close();
@@ -156,9 +147,9 @@ public class RecipeEditActivity extends AppCompatActivity {
         return true;
     }
 
-    private ArrayList<Ingredient> getIngredientsFromAdapter(ArrayAdapter<Ingredient> ingredientsAdapter)
+    private ArrayList<QuantityItem> getIngredientsFromAdapter(IngredientListAdapter ingredientsAdapter)
     {
-        ArrayList<Ingredient> ingredients = new ArrayList<>();
+        ArrayList<QuantityItem> ingredients = new ArrayList<>();
 
         if (ingredientsAdapter != null){
             for (int i = 0; i < ingredientsAdapter.getCount(); i++){

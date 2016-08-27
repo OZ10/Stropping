@@ -1,6 +1,7 @@
 package com.oz10.stropping;
 
 import android.content.Intent;
+import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.ActionBar;
@@ -9,6 +10,7 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
 
 import java.util.ArrayList;
 
@@ -26,6 +28,13 @@ public class IngredientsAddActivity extends AppCompatActivity {
         GetIngredientsFragment();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        _ingredientsListFragment._ingredientsAdatper.updateAdapterFromDatabase(this);
+    }
+
     private void GetIngredientsFragment()
     {
         FragmentManager fragmentManager = getSupportFragmentManager();
@@ -40,6 +49,12 @@ public class IngredientsAddActivity extends AppCompatActivity {
     {
         ActionBar actionBar = getSupportActionBar();
         actionBar.setDisplayHomeAsUpEnabled(true);
+    }
+
+    public void FABClick(View view)
+    {
+        Intent intent = new Intent(this, IngredientEditActivity.class);
+        this.startActivity(intent);
     }
 
     @Override

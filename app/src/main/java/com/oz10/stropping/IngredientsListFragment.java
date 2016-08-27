@@ -7,9 +7,6 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.CheckBox;
 import android.widget.ListView;
 
 import com.adapters.IngredientListAdapter;
@@ -24,11 +21,11 @@ import java.util.ArrayList;
 public class IngredientsListFragment extends Fragment {
 
     ArrayList<Ingredient> _ingredientsList = new ArrayList<>();
-    //ArrayList<Ingredient> _selectedIngredientsList = new ArrayList<>();
+
     ListView _ingredientsListView;
     IngredientListAdapter _ingredientsAdatper;
-    //Boolean _hasSelectedItems = false;
-    
+
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -40,7 +37,7 @@ public class IngredientsListFragment extends Fragment {
         _ingredientsList = db.getAllIngredients();
         db.close();
 
-        _ingredientsAdatper = new IngredientListAdapter(getContext(), R.layout.item_ingredient, _ingredientsList);
+        _ingredientsAdatper = new IngredientListAdapter(getContext(), _ingredientsList, R.layout.item_ingredient, IngredientListAdapter.type.ingredients);
 
         _ingredientsListView = (ListView) rootView.findViewById(R.id.ingredientslistView);
         _ingredientsListView.setAdapter(_ingredientsAdatper);
