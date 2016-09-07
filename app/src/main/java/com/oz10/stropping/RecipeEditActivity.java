@@ -47,7 +47,7 @@ public class RecipeEditActivity extends AppCompatActivity {
         //      the ingredients should be added to the adapter not a new list
         ListView ingredientListView = (ListView)findViewById(R.id.recipe_ingredientslistView);
         _ingredientsList = new ArrayList();
-        _ingredientArrayAdapter = new IngredientListAdapter(this, _ingredientsList, R.layout.item_shoppinglist, IngredientListAdapter.type.editrecipe);
+        _ingredientArrayAdapter = new IngredientListAdapter(this, _ingredientsList, R.layout.item_recipe_ingredient);
         ingredientListView.setAdapter(_ingredientArrayAdapter);
 
         Intent intent = getIntent();
@@ -65,7 +65,7 @@ public class RecipeEditActivity extends AppCompatActivity {
                 _recipeName.setText(_recipe.getName());
 
                 _ingredientsList = stroppingDatabase.getRecipeIngredientsById(recipeId);
-                _ingredientArrayAdapter = new IngredientListAdapter(this, _ingredientsList, R.layout.item_shoppinglist, IngredientListAdapter.type.editrecipe);
+                _ingredientArrayAdapter = new IngredientListAdapter(this, _ingredientsList, R.layout.item_recipe_ingredient);
                 ingredientListView.setAdapter(_ingredientArrayAdapter);
             }
 

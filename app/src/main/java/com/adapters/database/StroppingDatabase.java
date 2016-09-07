@@ -383,6 +383,11 @@ public class StroppingDatabase {
                 + " = " + id, null);
     }
 
+    public void deleteIngredientFromRecipe(long ingredientId)
+    {
+        int i = database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS, DatabaseHelper.COLUMN_INGREDIENTID + "=" + ingredientId, null);
+    }
+
     public void deleteAllIngredientsFromRecipe(long recipeId)
     {
         database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS, DatabaseHelper.COLUMN_RECIPEID + "=" + recipeId, null);

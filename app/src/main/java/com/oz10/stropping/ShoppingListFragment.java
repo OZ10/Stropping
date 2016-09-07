@@ -36,7 +36,7 @@ public class ShoppingListFragment extends Fragment {
                 R.layout.fragment_shopping_list, container, false);
 
         //_shoppingListAdapter = new ShoppingListAdapter(getContext(), android.R.layout.simple_list_item_1, IngredientsList);
-        _shoppingListAdapter = new IngredientListAdapter(getContext(), IngredientsList, R.layout.item_shoppinglist, IngredientListAdapter.type.shoppinglist);
+        _shoppingListAdapter = new IngredientListAdapter(getContext(), IngredientsList, R.layout.item_shoppinglist);
         ListView lv = (ListView) rootView.findViewById(R.id.shoppingListView);
         lv.setAdapter(_shoppingListAdapter);
         

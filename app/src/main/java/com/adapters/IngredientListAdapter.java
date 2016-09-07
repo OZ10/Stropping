@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
 
@@ -26,25 +27,17 @@ import java.util.List;
  */
 public class IngredientListAdapter extends BaseAdapter {
 
-    public enum type{
-        shoppinglist,
-        ingredients,
-        editrecipe
-    }
-
     public ArrayList<QuantityItem> _ingredientsList = new ArrayList<>();
     public ArrayList<Ingredient> _selectedIngredientsList = new ArrayList<>();
     private int _layoutResource;
     private LayoutInflater _layoutInflater;
-    private type _layoutType;
     private Context _parentContent;
 
-    public IngredientListAdapter(Context context, List objects, int layoutResource, type layoutType) {
+    public IngredientListAdapter(Context context, List objects, int layoutResource) {
 
         _ingredientsList = (ArrayList<QuantityItem>) objects;
         _layoutResource = layoutResource;
         _layoutInflater = LayoutInflater.from(context);
-        _layoutType = layoutType;
         _parentContent = context;
     }
 
@@ -86,19 +79,18 @@ public class IngredientListAdapter extends BaseAdapter {
             SetIngredientName(view, ingredient.getName(), ingredient.getId(), parent);
             SetIngredientQuantity(view, ingredient.getQuantityText(), parent);
 
-            switch (_layoutType){
-                case shoppinglist:
+            switch (_layoutResource){
+                case R.layout.item_shoppinglist:
                     break;
-                case ingredients:
+                case R.layout.item_ingredient:
                     SetIngredientIsSelected(view, (Ingredient)ingredient);
                     break;
 
-                case editrecipe:
+                case R.layout.item_recipe_ingredient:
+                    SetIngredientDeleteButton(view, (Ingredient)ingredient);
                     break;
             }
         }
-
-
 
         return view;
     }
@@ -139,7 +131,7 @@ public class IngredientListAdapter extends BaseAdapter {
         checkBox.setOnClickListener(new View.OnClickListener(){
                                         @Override
                                         public void onClick(View view) {
-                                            CheckBox checkBox = (CheckBox) view.findViewById(R.id.ingredient_isselected);
+                                            CheckBox checkBox = (CheckBox) view; // view.findViewById(R.id.ingredient_isselected);
                                             ingredient.setIsSelected(checkBox.isChecked());
 
                                             if (ingredient.getIsSelected()){
@@ -153,6 +145,25 @@ public class IngredientListAdapter extends BaseAdapter {
         checkBox.setChecked(ingredient.getIsSelected());
     }
 
+    private void SetIngredientDeleteButton(View view, final Ingredient ingredient)
+    {
+        Button button = (Button) view.findViewById(R.id.ingredient_delete);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                StroppingDatabase db = new StroppingDatabase(_parentContent);
+                db.open();
+
+                _ingredientsList.remove(ingredient);
+                db.deleteIngredientFromRecipe(ingredient.getId());
+
+                db.close();
+
+                notifyDataSetChanged();
+            }
+        });
+    }
+
     public void updateAdapterFromDatabase(Context context)
     {
         StroppingDatabase db = new StroppingDatabase(context);
@@ -160,22 +171,23 @@ public class IngredientListAdapter extends BaseAdapter {
 
         this._ingredientsList.clear();
 
-        switch (_layoutType){
-            case shoppinglist:
+        switch (_layoutResource){
+            case R.layout.item_shoppinglist:
                 ArrayList<ShoppingListItem> shoppingListItems = db.getAllShoppingListItems();
                 for (ShoppingListItem shoppingListItem:shoppingListItems
                         ) {
                     _ingredientsList.add(shoppingListItem);
                 }
                 break;
-            case ingredients:
+            case R.layout.item_ingredient:
                 ArrayList<Ingredient> ingredientListItems = db.getAllIngredients();
                 for (Ingredient ingredientListItem:ingredientListItems
                         ) {
                     _ingredientsList.add(ingredientListItem);
                 }
                 break;
-            case editrecipe:
+            case R.layout.item_recipe_ingredient:
+                //ArrayList<ShoppingListItem> shoppingListItems1 = db.get
                 break;
         }
 

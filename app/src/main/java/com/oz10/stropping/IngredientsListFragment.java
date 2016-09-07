@@ -37,7 +37,7 @@ public class IngredientsListFragment extends Fragment {
         _ingredientsList = db.getAllIngredients();
         db.close();
 
-        _ingredientsAdatper = new IngredientListAdapter(getContext(), _ingredientsList, R.layout.item_ingredient, IngredientListAdapter.type.ingredients);
+        _ingredientsAdatper = new IngredientListAdapter(getContext(), _ingredientsList, R.layout.item_ingredient);
 
         _ingredientsListView = (ListView) rootView.findViewById(R.id.ingredientslistView);
         _ingredientsListView.setAdapter(_ingredientsAdatper);
