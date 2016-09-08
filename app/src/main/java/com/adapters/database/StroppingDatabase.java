@@ -49,6 +49,9 @@ public class StroppingDatabase {
             DatabaseHelper.COLUMN_INGREDIENTID,
             DatabaseHelper.COLUMN_QUANTITY};
 
+    //TODO This needs to be renamed
+    private static StroppingDatabase db = null;
+
     public StroppingDatabase(Context context){
         dbHelper = new DatabaseHelper(context);
     }
@@ -59,6 +62,15 @@ public class StroppingDatabase {
 
     public void close(){
         dbHelper.close();
+    }
+
+    public static StroppingDatabase getInstance(Context context)
+    {
+        if (db == null){
+            db = new StroppingDatabase(context.getApplicationContext());
+            db.open();
+        }
+        return db;
     }
 
     //ShoppingList methods****************************************
@@ -236,6 +248,20 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(id) });
+    }
+
+    public void updateIngredient(Ingredient ingredient){
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, ingredient.getName());
+        values.put(DatabaseHelper.COLUMN_UOM, ingredient.getUOM());
+        values.put(DatabaseHelper.COLUMN_DEFAULTVALUE, ingredient.getDefaultValue());
+        values.put(DatabaseHelper.COLUMN_QUANTITY, ingredient.getQuantity());
+        values.put(DatabaseHelper.COLUMN_FAVOURITE, ingredient.getFavourite());
+        values.put(DatabaseHelper.COLUMN_ESSENTIAL, ingredient.getEssential());
+        values.put(DatabaseHelper.COLUMN_ADDED, ingredient.getAdded());
+        values.put(DatabaseHelper.COLUMN_HIDDEN, ingredient.getHidden());
+        database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
+                new String[] { String.valueOf(ingredient.getId()) });
     }
 
     //Creates a list of all ingredients in the db

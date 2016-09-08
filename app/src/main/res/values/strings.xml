@@ -6,4 +6,5 @@
     <string name="Toolbar_Ingredients">Ingredients</string>
     <string name="Toolbar_Recipes">Recipes</string>
     <string name="title_activity_ingredient_edit">Edit Ingredient</string>
+    <string name="dialog_set_quantity">Set Quantity</string>
 </resources>

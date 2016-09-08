@@ -155,15 +155,14 @@ public class IngredientsListFragment extends Fragment {
 
         if (_ingredientsAdatper._selectedIngredientsList.size() != 0) {
 
-            StroppingDatabase db = new StroppingDatabase(getContext());
-            db.open();
+            StroppingDatabase db = StroppingDatabase.getInstance(getContext());
 
             for (Ingredient ingredient : _ingredientsAdatper._selectedIngredientsList
                     ) {
                 db.createShoppingListItem(ingredient.getId(), ingredient.getQuantity(), 0);
             }
 
-            db.close();
+            //db.close();
 
             UnSelectAll();
 

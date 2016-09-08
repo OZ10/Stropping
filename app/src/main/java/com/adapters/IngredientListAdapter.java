@@ -1,8 +1,12 @@
 package com.adapters;
 
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.support.design.widget.Snackbar;
+import android.support.v7.app.AlertDialog;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,6 +14,8 @@ import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.FrameLayout;
+import android.widget.NumberPicker;
 import android.widget.TextView;
 
 import com.adapters.database.StroppingDatabase;
@@ -77,7 +83,7 @@ public class IngredientListAdapter extends BaseAdapter {
         // set default views (common across all layouts)
         if (ingredient != null) {
             SetIngredientName(view, ingredient.getName(), ingredient.getId(), parent);
-            SetIngredientQuantity(view, ingredient.getQuantityText(), parent);
+            SetIngredientQuantity(view, ingredient, parent);
 
             switch (_layoutResource){
                 case R.layout.item_shoppinglist:
@@ -110,19 +116,64 @@ public class IngredientListAdapter extends BaseAdapter {
         textView.setText(ingredientName);
     }
 
-    private void SetIngredientQuantity(View view, final String ingredientQuantity, final ViewGroup parent)
+    private void SetIngredientQuantity(View view, final QuantityItem ingredient, final ViewGroup parent)
     {
-        TextView textView = (TextView) view.findViewById(R.id.ingredient_quantity);
+        final TextView textView = (TextView) view.findViewById(R.id.ingredient_quantity);
         textView.setOnClickListener(new View.OnClickListener(){
                                         @Override
                                         public void onClick(View view) {
                                             //TODO Open Edit ingredient activity
-                                            Snackbar snackbar = Snackbar.make(parent, ingredientQuantity + " required!", Snackbar.LENGTH_SHORT);
-                                            snackbar.show();
+//                                            Snackbar snackbar = Snackbar.make(parent, ingredientQuantity + " required!", Snackbar.LENGTH_SHORT);
+//                                            snackbar.show();
+
+                                            int currentValue = ingredient.getQuantity();
+                                            int minValue = currentValue < 21 ? 1 : currentValue - 20;
+                                            int maxValue = currentValue + 20;
+
+                                            final NumberPicker picker = new NumberPicker(_parentContent);
+                                            picker.setMinValue(minValue);
+                                            picker.setMaxValue(maxValue);
+                                            picker.setValue(currentValue);
+
+                                            final FrameLayout parent = new FrameLayout(_parentContent);
+                                            parent.addView(picker, new FrameLayout.LayoutParams(
+                                                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                                                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                                                    Gravity.CENTER));
+
+                                            AlertDialog.Builder builder = new AlertDialog.Builder(_parentContent);
+                                            builder.setTitle(R.string.dialog_set_quantity);
+                                            builder.setView(parent);
+
+                                            builder.setPositiveButton("ok", new DialogInterface.OnClickListener(){
+
+                                                @Override
+                                                public void onClick(DialogInterface dialogInterface, int i) {
+                                                    int quantity = picker.getValue();
+                                                    ingredient.setQuantity(quantity);
+                                                    textView.setText(ingredient.getQuantityText());
+
+                                                    StroppingDatabase db = StroppingDatabase.getInstance(_parentContent);
+
+                                                    switch (_layoutResource){
+                                                        case R.layout.item_shoppinglist:
+                                                            db.updateShoppingListItem((ShoppingListItem) ingredient);
+                                                            break;
+                                                        case R.layout.item_ingredient:
+                                                            db.updateIngredient((Ingredient)ingredient);
+                                                            break;
+                                                        case R.layout.item_recipe_ingredient:
+                                                            break;
+                                                    }
+                                                }
+                                            });
+
+                                            Dialog dialog = builder.create();
+                                            dialog.show();
                                         }
                                     }
         );
-        textView.setText(ingredientQuantity);
+        textView.setText(ingredient.getQuantityText());
     }
 
     private void SetIngredientIsSelected(View view, final Ingredient ingredient)
@@ -151,13 +202,7 @@ public class IngredientListAdapter extends BaseAdapter {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                StroppingDatabase db = new StroppingDatabase(_parentContent);
-                db.open();
-
                 _ingredientsList.remove(ingredient);
-                db.deleteIngredientFromRecipe(ingredient.getId());
-
-                db.close();
 
                 notifyDataSetChanged();
             }
@@ -166,8 +211,7 @@ public class IngredientListAdapter extends BaseAdapter {
 
     public void updateAdapterFromDatabase(Context context)
     {
-        StroppingDatabase db = new StroppingDatabase(context);
-        db.open();
+        StroppingDatabase db = StroppingDatabase.getInstance(_parentContent);
 
         this._ingredientsList.clear();
 
@@ -193,7 +237,7 @@ public class IngredientListAdapter extends BaseAdapter {
 
         notifyDataSetChanged();
 
-        db.close();
+        //db.close();
 
     }
 
