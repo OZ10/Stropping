@@ -4,16 +4,19 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Paint;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AlertDialog;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.NumberPicker;
 import android.widget.TextView;
@@ -103,13 +106,29 @@ public class IngredientListAdapter extends BaseAdapter {
 
     private void SetIngredientName(View view, final String ingredientName, final Long ingredientId, final ViewGroup parent)
     {
-        TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
+        final TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
         textView.setOnClickListener(new View.OnClickListener(){
                                         @Override
                                         public void onClick(View view) {
-                                            Intent intent = new Intent(_parentContent, IngredientEditActivity.class);
-                                            intent.putExtra("IngredientId", ingredientId);
-                                            _parentContent.startActivity(intent);
+                                            switch (_layoutResource){
+                                                case R.layout.item_shoppinglist:
+                                                    //TODO Refactor this. Must be better way to do this
+                                                    int i = textView.getPaintFlags();
+                                                    if (i == 1281){
+                                                        textView.setPaintFlags(textView.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+                                                    }else{
+                                                        textView.setPaintFlags(textView.getPaintFlags() & (~ Paint.STRIKE_THRU_TEXT_FLAG));
+                                                    }
+
+                                                    break;
+                                                case R.layout.item_ingredient:
+                                                    Intent intent = new Intent(_parentContent, IngredientEditActivity.class);
+                                                    intent.putExtra("IngredientId", ingredientId);
+                                                    _parentContent.startActivity(intent);
+                                                    break;
+                                                case R.layout.item_recipe_ingredient:
+                                                    break;
+                                            }
                                         }
                                     }
         );
@@ -126,20 +145,7 @@ public class IngredientListAdapter extends BaseAdapter {
 //                                            Snackbar snackbar = Snackbar.make(parent, ingredientQuantity + " required!", Snackbar.LENGTH_SHORT);
 //                                            snackbar.show();
 
-                                            int currentValue = ingredient.getQuantity();
-                                            int minValue = currentValue < 21 ? 1 : currentValue - 20;
-                                            int maxValue = currentValue + 20;
-
-                                            final NumberPicker picker = new NumberPicker(_parentContent);
-                                            picker.setMinValue(minValue);
-                                            picker.setMaxValue(maxValue);
-                                            picker.setValue(currentValue);
-
-                                            final FrameLayout parent = new FrameLayout(_parentContent);
-                                            parent.addView(picker, new FrameLayout.LayoutParams(
-                                                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                                                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                                                    Gravity.CENTER));
+                                            final FrameLayout parent = SetupDialogView(ingredient);
 
                                             AlertDialog.Builder builder = new AlertDialog.Builder(_parentContent);
                                             builder.setTitle(R.string.dialog_set_quantity);
@@ -149,7 +155,7 @@ public class IngredientListAdapter extends BaseAdapter {
 
                                                 @Override
                                                 public void onClick(DialogInterface dialogInterface, int i) {
-                                                    int quantity = picker.getValue();
+                                                    int quantity = getSelectedValue(ingredient, parent); // picker.getValue();
                                                     ingredient.setQuantity(quantity);
                                                     textView.setText(ingredient.getQuantityText());
 
@@ -174,6 +180,49 @@ public class IngredientListAdapter extends BaseAdapter {
                                     }
         );
         textView.setText(ingredient.getQuantityText());
+    }
+
+    private FrameLayout SetupDialogView(QuantityItem ingredient){
+        final FrameLayout parent = new FrameLayout(_parentContent);
+
+        int currentValue = ingredient.getQuantity();
+
+        if (ingredient.getUOM().equals("number of")){
+            int minValue = 1; //currentValue < 21 ? 1 : currentValue - 20;
+            int maxValue = currentValue + 50;
+
+            final NumberPicker picker = new NumberPicker(_parentContent);
+            picker.setId(R.id.quantityvalue);
+            picker.setMinValue(minValue);
+            picker.setMaxValue(maxValue);
+            picker.setValue(currentValue);
+
+            parent.addView(picker, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER));
+        }else{
+            EditText editText = new EditText(_parentContent);
+            editText.setId(R.id.quantityvalue);
+            editText.setText(String.valueOf(currentValue));
+
+            parent.addView(editText, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER));
+
+        }
+        return parent;
+    }
+
+    private int getSelectedValue(QuantityItem ingredient, FrameLayout frameLayout){
+        if (ingredient.getUOM().equals("number of")) {
+            NumberPicker numberPicker = (NumberPicker) frameLayout.findViewById(R.id.quantityvalue);
+            return numberPicker.getValue();
+        }else{
+            EditText editText = (EditText) frameLayout.findViewById(R.id.quantityvalue);
+            return Integer.valueOf(editText.getText().toString());
+        }
     }
 
     private void SetIngredientIsSelected(View view, final Ingredient ingredient)
