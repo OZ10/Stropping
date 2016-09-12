@@ -4,34 +4,35 @@
     android:layout_height="match_parent"
     android:layout_weight="1"
     android:descendantFocusability="blocksDescendants"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
      >
     
     <TextView android:id="@+id/ingredient_name"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:textAppearance="?android:attr/textAppearanceListItemSmall"
         android:gravity="center_vertical"
         android:paddingStart="?android:attr/listPreferredItemPaddingStart"
         android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
         android:minHeight="?android:attr/listPreferredItemHeightSmall"
-        android:textSize="24dp"
+        android:textSize="20sp"
         xmlns:android="http://schemas.android.com/apk/res/android"
         android:layout_weight="0.5"
-        />
+        android:textColor="@color/secondaryText_Black" />
     
     <TextView
         android:id="@+id/ingredient_quantity"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:background="@drawable/textview_rounded"
         android:textAppearance="?android:attr/textAppearanceListItemSmall"
-        android:gravity="center_vertical|center_horizontal"
+        android:gravity="center_vertical"
         android:paddingStart="?android:attr/listPreferredItemPaddingStart"
         android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
-        android:text="eh?"
+        android:text="quantity"
         android:textColor="@color/foreground_material_dark"
-        android:layout_marginRight="20dp" />
+        android:layout_marginRight="20dp"
+        />
         
 </LinearLayout>

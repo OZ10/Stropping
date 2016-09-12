@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="horizontal" android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:layout_weight="1"
-     >
+    android:paddingLeft="10dp"
+    android:paddingRight="10dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
 <!-- android:descendantFocusability="blocksDescendants" -->
+
+    <android.support.v7.widget.AppCompatCheckBox
+        android:id="@+id/ingredient_isselected"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentLeft="false"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true" />
 
     <TextView
         android:id="@+id/ingredient_name"
@@ -14,10 +25,27 @@
         android:gravity="center_vertical"
         android:paddingStart="?android:attr/listPreferredItemPaddingStart"
         android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
-        android:minHeight="?android:attr/listPreferredItemHeightSmall"
+        android:minHeight="25dp"
         android:layout_weight="0.5"
         android:clickable="true"
-        android:text="Ingredient"/>
+        android:text="Ingredient"
+        android:textColor="@color/primaryText_Black"
+        android:layout_toRightOf="@+id/ingredient_isselected" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:text="category"
+        android:id="@+id/ingredient_category"
+        android:textColor="@color/tertiaryText_Black"
+        android:paddingStart="?android:attr/listPreferredItemPaddingStart"
+        android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
+        android:minHeight="25dp"
+        android:layout_below="@+id/ingredient_name"
+        android:layout_toRightOf="@+id/ingredient_isselected"
+        android:layout_toEndOf="@+id/ingredient_isselected"
+        android:gravity="center" />
 
     <TextView
         android:id="@+id/ingredient_quantity"
@@ -30,15 +58,9 @@
         android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
         android:text="eh?"
         android:textColor="@color/foreground_material_dark"
-        android:layout_marginRight="20dp" />
+        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="false"
+        android:layout_above="@+id/ingredient_category"
+        android:layout_centerVertical="true" />
 
-    <android.support.v7.widget.AppCompatCheckBox
-        android:id="@+id/ingredient_isselected"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-         />
-
-        <!-- android:layout_weight="0.5"
-        android:button="@null"
-        android:drawableRight="?android:attr/listChoiceIndicatorMultiple" -->
-</LinearLayout>
+</RelativeLayout>
