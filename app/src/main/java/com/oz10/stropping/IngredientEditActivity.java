@@ -58,8 +58,8 @@ public class IngredientEditActivity extends AppCompatActivity {
                 _ingredientName.setText(_ingredient.getName());
                 _quantity.setText(String.valueOf(_ingredient.getQuantity()));
                 
-                //_uomSpinner.setSelection(index);
-                
+                _uomSpinner.setSelection(((ArrayAdapter)_uomSpinner.getAdapter()).getPosition(_ingredient.getUOM()));
+
                 _favourite.setChecked(_ingredient.getFavourite());
                 _essential.setChecked(_ingredient.getEssential());
 

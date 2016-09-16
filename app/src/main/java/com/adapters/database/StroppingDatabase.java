@@ -232,6 +232,7 @@ public class StroppingDatabase {
     public void deleteIngredient(Ingredient ingredient){
         long id = ingredient.getId();
         System.out.println("Ingredient deleted with id: " + id);
+        deleteIngredientFromRecipe(id);
         database.delete(DatabaseHelper.TABLE_INGREDIENTS, DatabaseHelper.COLUMN_ID
                 + " = " + id, null);
     }
@@ -405,6 +406,7 @@ public class StroppingDatabase {
     public void deleteRecipe(Recipe recipe){
         long id = recipe.getId();
         System.out.println("Recipe delete with id: " + id);
+        deleteAllIngredientsFromRecipe(id);
         database.delete(DatabaseHelper.TABLE_RECIPES, DatabaseHelper.COLUMN_ID
                 + " = " + id, null);
     }

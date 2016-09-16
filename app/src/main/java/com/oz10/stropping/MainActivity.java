@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
 
         SetupBottomBar(savedInstanceState);
         
-        SetupDatabase();
+//        SetupDatabase();
     }
 
     private void SetupToolbar()
@@ -294,7 +294,9 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_resetdb) {
+            SetupDatabase();
+            onResume();
             return true;
         }
 

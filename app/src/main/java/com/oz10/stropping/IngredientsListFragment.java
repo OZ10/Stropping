@@ -25,17 +25,14 @@ public class IngredientsListFragment extends Fragment {
     ListView _ingredientsListView;
     IngredientListAdapter _ingredientsAdatper;
 
-
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         ViewGroup rootView = (ViewGroup) inflater.inflate(
                 R.layout.fragment_ingredients, container, false);
 
-        StroppingDatabase db = new StroppingDatabase(getContext());
-        db.open();
+        StroppingDatabase db = StroppingDatabase.getInstance(getContext());
         _ingredientsList = db.getAllIngredients();
-        db.close();
 
         _ingredientsAdatper = new IngredientListAdapter(getContext(), _ingredientsList, R.layout.item_ingredient);
 
@@ -131,6 +128,9 @@ public class IngredientsListFragment extends Fragment {
             if (ingredient.getIsSelected()){
                 ingredient.setIsSelected();
             }
+            // Quantity may have been changed by user
+            // reset quantity to default value
+            ingredient.setQuantity(ingredient.getDefaultValue());
         }
 
         _ingredientsAdatper.notifyDataSetChanged();

@@ -37,8 +37,10 @@ public class ShoppingListFragment extends Fragment {
 
         //_shoppingListAdapter = new ShoppingListAdapter(getContext(), android.R.layout.simple_list_item_1, IngredientsList);
         _shoppingListAdapter = new IngredientListAdapter(getContext(), IngredientsList, R.layout.item_shoppinglist);
+        _shoppingListAdapter.updateAdapterFromDatabase(getContext());
         ListView lv = (ListView) rootView.findViewById(R.id.shoppingListView);
         lv.setAdapter(_shoppingListAdapter);
+        lv.setEmptyView(rootView.findViewById(android.R.id.empty));
         
         // This might need to be in the onCreate method
         setHasOptionsMenu(true);

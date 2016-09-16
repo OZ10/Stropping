@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Paint;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AlertDialog;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,6 +19,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.NumberPicker;
 import android.widget.TextView;
 
@@ -65,9 +67,21 @@ public class IngredientListAdapter extends BaseAdapter {
         return _ingredientsList.get(i);
     }
 
-    public void add(Ingredient ingredient)
+    public boolean add(Ingredient ingredient, boolean checkAlreadyAdded)
     {
+        if (checkAlreadyAdded){
+            for (QuantityItem i: _ingredientsList
+                    ) {
+                if (i.getName().equals(ingredient.getName())){
+                    // already added to list
+                    return false;
+                }
+
+            }
+        }
+
         _ingredientsList.add(ingredient);
+        return true;
     }
 
     @Override
@@ -192,6 +206,7 @@ public class IngredientListAdapter extends BaseAdapter {
             int maxValue = currentValue + 50;
 
             final NumberPicker picker = new NumberPicker(_parentContent);
+            //picker.setMinimumWidth(3000);
             picker.setId(R.id.quantityvalue);
             picker.setMinValue(minValue);
             picker.setMaxValue(maxValue);
@@ -205,8 +220,17 @@ public class IngredientListAdapter extends BaseAdapter {
             EditText editText = new EditText(_parentContent);
             editText.setId(R.id.quantityvalue);
             editText.setText(String.valueOf(currentValue));
+            editText.setInputType(InputType.TYPE_CLASS_NUMBER);
 
-            parent.addView(editText, new FrameLayout.LayoutParams(
+            TextView textView = new TextView(_parentContent);
+            textView.setText(ingredient.getUOM());
+
+            LinearLayout linearLayout = new LinearLayout(_parentContent);
+            linearLayout.setOrientation(LinearLayout.HORIZONTAL);
+            linearLayout.addView(editText);
+            linearLayout.addView(textView);
+
+            parent.addView(linearLayout, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     Gravity.CENTER));

@@ -18,7 +18,8 @@
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
             android:layout_alignParentStart="true"
-            android:src="@drawable/ic_pot_mix_grey600_48dp" />
+            android:src="@drawable/ic_pot_mix_grey600_48dp"
+            android:background="@color/emptyBackground"/>
 
         <EditText
             android:layout_width="match_parent"
@@ -51,6 +52,26 @@
             android:layout_marginRight="16dp"
             android:layout_marginBottom="16dp" />
 
+        <!--<FrameLayout-->
+            <!--android:id="@android:id/empty"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="match_parent">-->
+
+            <!--<TextView-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="match_parent"-->
+                <!--android:background="@color/emptyBackground"-->
+                <!--android:text="Shopping list is empty"-->
+                <!--android:gravity="center_vertical|center_horizontal"-->
+                <!--android:paddingTop="150dp"/>-->
+
+            <!--<ImageView-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="80dp"-->
+                <!--android:src="@drawable/ic_food_apple_grey600_48dp"-->
+                <!--android:layout_gravity="center"-->
+                <!--/>-->
+        <!--</FrameLayout>-->
 
     </LinearLayout>
 

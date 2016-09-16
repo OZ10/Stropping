@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <android.support.design.widget.AppBarLayout
+        android:id="@+id/my_appbar_container"
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+
+        <android.support.design.widget.CollapsingToolbarLayout
+            android:id="@+id/collapsing_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:contentScrim="@color/colorPrimary">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:id="@+id/recipe_imageView"
+                android:src="@drawable/ic_pot_mix_grey600_48dp"
+                android:background="@color/emptyBackground"
+                app:layout_collapseMode="parallax"
+                android:scaleType="centerCrop"/>
+
+            <!--<TextView-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:textAppearance="?android:attr/textAppearanceMedium"-->
+                <!--android:text="Ingredients"-->
+                <!--android:id="@+id/ingredients_header"-->
+                <!--android:background="@color/bb_inActiveBottomBarItemColor"-->
+                <!--android:textColor="@color/white"-->
+                <!--android:padding="10dp"/>-->
+
+            <!--<android.support.v7.widget.Toolbar-->
+                <!--android:id="@+id/edit_recipe_toolbar"-->
+                <!--android:layout_height="?attr/actionBarSize"-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"-->
+                <!--android:title="@string/Toolbar_EditRecipe"-->
+                <!--app:popupTheme="@style/ThemeOverlay.AppCompat.Light"-->
+                <!--app:layout_collapseMode="pin"-->
+                <!--/>-->
+
+        </android.support.design.widget.CollapsingToolbarLayout>
+
+    </android.support.design.widget.AppBarLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:focusableInTouchMode="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        app:layout_scrollFlags="scroll">
+
+        <EditText
+            android:id="@+id/recipe_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Recipe Name"
+            android:gravity="center"
+            android:textAppearance="?android:attr/textAppearanceLarge"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ingredients"
+            android:padding="16dp"/>
+
+        <ListView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/recipe_ingredientslistView"
+            />
+
+        <FrameLayout
+            android:id="@android:id/empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/emptyBackground"
+                android:text="No ingredients"
+                android:gravity="center_horizontal"
+                android:paddingTop="70dp"
+                />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:src="@drawable/ic_food_apple_grey600_48dp"
+                android:paddingTop="20dp"
+                />
+        </FrameLayout>
+    </LinearLayout>
+
+
+
+
+    <!--<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
+        <!--android:orientation="vertical" android:layout_width="match_parent"-->
+        <!--android:layout_height="match_parent"-->
+        <!--android:descendantFocusability="beforeDescendants"-->
+        <!--android:focusableInTouchMode="true"-->
+        <!---->
+        <!--&gt;-->
+
+        <!--<FrameLayout-->
+            <!--android:id="@android:id/empty"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="match_parent">-->
+
+            <!--<TextView-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="match_parent"-->
+                <!--android:background="@color/emptyBackground"-->
+                <!--android:text="Shopping list is empty"-->
+                <!--android:gravity="center_vertical|center_horizontal"-->
+                <!--android:paddingTop="150dp"/>-->
+
+            <!--<ImageView-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="80dp"-->
+                <!--android:src="@drawable/ic_food_apple_grey600_48dp"-->
+                <!--android:layout_gravity="center"-->
+                <!--/>-->
+        <!--</FrameLayout>-->
+
+    <!--</LinearLayout>-->
+
+    <android.support.design.widget.FloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="@dimen/fab_margin"
+        android:src="@drawable/ic_add_white_24dp"
+        android:onClick="EditRecipeFABClick"/>
+</android.support.design.widget.CoordinatorLayout>

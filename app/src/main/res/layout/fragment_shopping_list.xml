@@ -2,13 +2,36 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingTop="12dp"
+
 >
 
     <ListView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/shoppingListView"
+        android:paddingTop="12dp"
         />
+
+    <FrameLayout
+        android:id="@android:id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/emptyBackground"
+            android:text="Shopping list is empty"
+            android:gravity="center_vertical|center_horizontal"
+            android:paddingTop="150dp"/>
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_food_apple_grey600_48dp"
+            android:layout_gravity="center"
+            />
+    </FrameLayout>
+
 
 </FrameLayout>

@@ -14,24 +14,23 @@
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="16dp">
+            >
 
             <ImageView
                 android:id="@+id/recipe_imageView"
                 android:layout_width="match_parent"
                 android:layout_height="130dp"
                 android:layout_alignParentTop="true"
-                android:layout_alignParentLeft="false"
                 android:src="@drawable/ic_pot_mix_grey600_48dp"
                 android:layout_centerHorizontal="true"
-                 />
+                android:background="@color/emptyBackground"/>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_below="@+id/recipe_imageView"
                 android:weightSum="1.0"
-                android:layout_alignParentBottom="false">
+                android:padding="16dp">
 
                 <TextView
                     android:id="@+id/recipe_id"
@@ -44,7 +43,7 @@
                     android:id="@+id/recipe_name"
                     android:layout_width="0dp"
                     android:layout_height="fill_parent"
-                    android:text="CardView"
+                    android:text="Recipe Name"
                     android:layout_alignParentBottom="false"
                     android:gravity="fill_vertical"
                     android:layout_weight="0.7"/>
@@ -53,8 +52,6 @@
                     android:id="@+id/recipe_addButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_below="@+id/recipe_imageView"
-                    android:layout_toRightOf="@+id/recipe_name"
                     android:drawableLeft="@drawable/ic_playlist_add_black_24dp"
                     style="?android:attr/borderlessButtonStyle"
                     android:layout_weight="0.3"
