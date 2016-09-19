@@ -136,9 +136,9 @@ public class IngredientEditActivity extends AppCompatActivity {
 
                 if (_ingredient.getId() == 0){
                     // new ingredient
-                    _ingredient = db.createIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+                    _ingredient = db.createIngredient(name, uom, quantity, quantity, isFavourite, isEssential,0, 0, 0);
                 }else{
-                    db.updateIngredient(_ingredient.getId(), name, uom, quantity, quantity, isFavourite, isEssential,0, 0);
+                    db.updateIngredient(_ingredient.getId(), name, uom, quantity, quantity, isFavourite, isEssential,0, 0, 0);
                 }
 
                 finish();

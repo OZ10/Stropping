@@ -60,7 +60,7 @@ public class ShoppingListFragment extends Fragment {
             db.DeleteAllRowsFromTable(DatabaseHelper.TABLE_SHOPPINGLIST);
             db.close();
             
-            //TOOD Maybe just clear the adapters list and notify at this point? Below method opens the database, queries etc
+            //TODO Maybe just clear the adapters list and notify at this point? Below method opens the database, queries etc
             _shoppingListAdapter.updateAdapterFromDatabase(getContext());
         }
 

@@ -5,7 +5,6 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
-import android.provider.ContactsContract;
 
 import com.classes.Ingredient;
 import com.classes.QuantityItem;
@@ -31,7 +30,8 @@ public class StroppingDatabase {
             DatabaseHelper.COLUMN_FAVOURITE,
             DatabaseHelper.COLUMN_ESSENTIAL,
             DatabaseHelper.COLUMN_ADDED,
-            DatabaseHelper.COLUMN_HIDDEN};
+            DatabaseHelper.COLUMN_HIDDEN,
+            DatabaseHelper.COLUMN_CATEGORY};
 
     private String[] shoppingListTableAllColumns = {DatabaseHelper.COLUMN_ID,
             DatabaseHelper.COLUMN_INGREDIENTID,
@@ -170,6 +170,8 @@ public class StroppingDatabase {
         database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS,null,null);
         database.delete(DatabaseHelper.TABLE_RECIPES,null,null);
         database.delete(DatabaseHelper.TABLE_SHOPPINGLIST,null,null);
+        database.delete(DatabaseHelper.TABLE_UOM,null,null);
+        database.delete(DatabaseHelper.TABLE_INGREDIENTCATEGORIES,null,null);
     }
 
     //Ingredients methods****************************************
@@ -207,7 +209,7 @@ public class StroppingDatabase {
         return null;
     }
 
-    public Ingredient createIngredient(String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden){
+    public Ingredient createIngredient(String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden, int category){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, name);
         values.put(DatabaseHelper.COLUMN_UOM, uom);
@@ -217,6 +219,7 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, isEssential);
         values.put(DatabaseHelper.COLUMN_ADDED, isAdded);
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
+        values.put(DatabaseHelper.COLUMN_CATEGORY, category);
         long insertId = database.insert(DatabaseHelper.TABLE_INGREDIENTS, null,
                 values);
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS,
@@ -237,7 +240,7 @@ public class StroppingDatabase {
                 + " = " + id, null);
     }
 
-    public void updateIngredient(long id, String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden){
+    public void updateIngredient(long id, String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden, int category){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, name);
         values.put(DatabaseHelper.COLUMN_UOM, uom);
@@ -247,6 +250,7 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, isEssential);
         values.put(DatabaseHelper.COLUMN_ADDED, isAdded);
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
+        values.put(DatabaseHelper.COLUMN_CATEGORY, category);
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(id) });
     }
@@ -261,6 +265,7 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, ingredient.getEssential());
         values.put(DatabaseHelper.COLUMN_ADDED, ingredient.getAdded());
         values.put(DatabaseHelper.COLUMN_HIDDEN, ingredient.getHidden());
+        values.put(DatabaseHelper.COLUMN_CATEGORY, ingredient.getCategory());
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(ingredient.getId()) });
     }
@@ -302,6 +307,7 @@ public class StroppingDatabase {
         ingredient.setEssential(cursor.getInt(6));
         ingredient.setadded(cursor.getInt(7));
         ingredient.setHidden(cursor.getInt(8));
+        ingredient.setCategory(cursor.getInt(9));
         return ingredient;
     }
 
@@ -322,11 +328,12 @@ public class StroppingDatabase {
 
     }
 
-    public Recipe createRecipe(String name, int serves, String notes){
+    public Recipe createRecipe(String name, int serves, String notes, String recipeImage){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
         values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
         values.put(DatabaseHelper.COLUMN_RECIPENOTES, notes);
+        values.put(DatabaseHelper.COLUMN_RECIPEIMAGE, recipeImage);
         long insertId = database.insert(DatabaseHelper.TABLE_RECIPES, null,
                 values);
 
@@ -334,11 +341,12 @@ public class StroppingDatabase {
         return recipe;
     }
 
-    public Recipe createRecipe(String name, int serves, String notes, ArrayList<QuantityItem> recipeIngredients){
+    public Recipe createRecipe(String name, int serves, String notes, String recipeImage, ArrayList<QuantityItem> recipeIngredients){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
         values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
         values.put(DatabaseHelper.COLUMN_RECIPENOTES, notes);
+        values.put(DatabaseHelper.COLUMN_RECIPEIMAGE, recipeImage);
         long insertId = database.insert(DatabaseHelper.TABLE_RECIPES, null,
                 values);
 
@@ -385,17 +393,18 @@ public class StroppingDatabase {
         Recipe recipe = new Recipe();
         recipe.setId(cursor.getLong(0));
         recipe.setName(cursor.getString(1));
-        recipe.setRecipeImage(cursor.getInt(2));
+        recipe.setRecipeImage(cursor.getString(2));
         recipe.setServes(cursor.getInt(3));
         recipe.setNotes(cursor.getString(4));
         return recipe;
     }
 
-    public void updateRecipe(long id, String name, int serves, String notes, ArrayList<QuantityItem> ingredients){
+    public void updateRecipe(long id, String name, int serves, String notes, String recipeImage, ArrayList<QuantityItem> ingredients){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_RECIPENAME, name);
         values.put(DatabaseHelper.COLUMN_RECIPESERVES, serves);
         values.put(DatabaseHelper.COLUMN_RECIPENOTES, notes);
+        values.put(DatabaseHelper.COLUMN_RECIPEIMAGE, recipeImage);
         //TODO Does this update statement need the String.valueOf(id) statement?
         database.update(DatabaseHelper.TABLE_RECIPES, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(id) });

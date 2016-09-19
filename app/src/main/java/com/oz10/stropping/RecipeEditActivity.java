@@ -1,7 +1,11 @@
 package com.oz10.stropping;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.support.v4.content.FileProvider;
 import android.support.v4.view.ViewCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
@@ -10,8 +14,10 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ListView;
 
 import com.adapters.IngredientListAdapter;
@@ -20,6 +26,9 @@ import com.classes.Ingredient;
 import com.classes.QuantityItem;
 import com.classes.Recipe;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 
 /**
@@ -29,9 +38,11 @@ public class RecipeEditActivity extends AppCompatActivity {
 
     private EditText _recipeName;
     private Recipe _recipe;
+    private ImageView _recipeImage;
     private IngredientListAdapter _ingredientArrayAdapter;
 
     private ArrayList<Ingredient> _ingredientsList;
+    private Uri _photoURI;
 
     ActionBar actionBar;
     @Override
@@ -77,8 +88,35 @@ public class RecipeEditActivity extends AppCompatActivity {
         }else{
             // New recipe
             _recipe = new Recipe();
-//            _recipe.setName("New Recipe");
         }
+
+        _recipeImage = (ImageView) findViewById(R.id.recipe_imageView);
+
+        if (!_recipe.getRecipeImage().equals("")){
+            _recipeImage.setImageURI(Uri.parse(_recipe.getRecipeImage()));
+        }
+
+        _recipeImage.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                // Ensure that there's a camera activity to handle the intent
+                if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+                    File photoFile = null;
+                    try {
+                        photoFile = createImageFile();
+                    } catch (IOException ex){
+                        //TODO
+                    }
+                    if (photoFile != null){
+                        _photoURI = FileProvider.getUriForFile(view.getContext(), "com.example.android.fileprovider", photoFile);
+                        takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, _photoURI);
+                        startActivityForResult(takePictureIntent, 2);
+                    }
+                }
+            }
+        });
+
 
         SetupActionbar();
     }
@@ -96,16 +134,24 @@ public class RecipeEditActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode == RESULT_OK){
-            ArrayList<Long> ingredientIds = (ArrayList<Long>) data.getSerializableExtra("IngredientIds");
+            switch (requestCode){
+                case 1:
+                    ArrayList<Long> ingredientIds = (ArrayList<Long>) data.getSerializableExtra("IngredientIds");
 
-            StroppingDatabase db = StroppingDatabase.getInstance(this);
+                    StroppingDatabase db = StroppingDatabase.getInstance(this);
 
-            for (Long id:ingredientIds
-                 ) {
-                    _ingredientArrayAdapter.add(db.getIngredientFromId(id), true);
+                    for (Long id:ingredientIds
+                            ) {
+                        _ingredientArrayAdapter.add(db.getIngredientFromId(id), true);
+                    }
+
+                    _ingredientArrayAdapter.notifyDataSetChanged();
+                    break;
+                case 2:
+                    _recipeImage.setImageURI(_photoURI);
+                    _recipe.setRecipeImage(_photoURI.toString());
+                    break;
             }
-
-            _ingredientArrayAdapter.notifyDataSetChanged();
         }
     }
 
@@ -113,7 +159,6 @@ public class RecipeEditActivity extends AppCompatActivity {
     {
         Intent intent = new Intent(this, IngredientsAddActivity.class);
         startActivityForResult(intent, 1);
-
     }
 
     @Override
@@ -154,10 +199,10 @@ public class RecipeEditActivity extends AppCompatActivity {
                 if (_recipe.getId() == 0){
                     // new recipe
                     //TODO Need to include properties serves & notes
-                    _recipe = db.createRecipe(_recipeName.getText().toString(), 0, "");
+                    _recipe = db.createRecipe(_recipeName.getText().toString(), 0, "", "");
                     db.addIngredientsToRecipe(_recipe.getId(), _ingredientArrayAdapter._ingredientsList); // getIngredientsFromAdapter(_ingredientArrayAdapter));
                 }else{
-                    db.updateRecipe(_recipe.getId(),_recipeName.getText().toString(), _recipe.getServes(), _recipe.getNotes(), _ingredientArrayAdapter._ingredientsList); // getIngredientsFromAdapter(_ingredientArrayAdapter));
+                    db.updateRecipe(_recipe.getId(),_recipeName.getText().toString(), _recipe.getServes(), _recipe.getNotes(), _recipe.getRecipeImage(), _ingredientArrayAdapter._ingredientsList); // getIngredientsFromAdapter(_ingredientArrayAdapter));
                 }
 
                 finish();
@@ -179,5 +224,16 @@ public class RecipeEditActivity extends AppCompatActivity {
         }
 
         return ingredients;
+    }
+
+    private File createImageFile() throws IOException{
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                "JPG_A",
+                ".jpg",
+                storageDir
+        );
+
+        return image;
     }
 }

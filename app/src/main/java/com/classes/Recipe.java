@@ -9,7 +9,7 @@ import java.util.ArrayList;
  */
 public class Recipe extends BaseItem {
 
-    private int recipeImage = R.drawable.ic_pot_mix_grey600_24dp;
+    private String recipeImage; // = R.drawable.ic_pot_mix_grey600_24dp;
     private int serves;
     private String notes;
 
@@ -21,11 +21,11 @@ public class Recipe extends BaseItem {
         this.id = id;
     }
 
-    public int getRecipeImage(){
+    public String getRecipeImage(){
         return recipeImage;
     }
 
-    public void setRecipeImage(int recipeImage){
+    public void setRecipeImage(String recipeImage){
         this.recipeImage = recipeImage;
     }
 
@@ -68,6 +68,7 @@ public class Recipe extends BaseItem {
     public Recipe()
     {
         this.id = new Long(0);
+        this.recipeImage = "";
         this.ingredients = new ArrayList<>();
     }
 

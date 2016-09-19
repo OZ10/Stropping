@@ -23,7 +23,8 @@
                 android:layout_alignParentTop="true"
                 android:src="@drawable/ic_pot_mix_grey600_48dp"
                 android:layout_centerHorizontal="true"
-                android:background="@color/emptyBackground"/>
+                android:background="@color/emptyBackground"
+                android:scaleType="centerCrop" />
 
             <LinearLayout
                 android:layout_width="match_parent"

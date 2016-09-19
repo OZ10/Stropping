@@ -11,6 +11,7 @@ public class Ingredient extends QuantityItem {
     private boolean added;
     private boolean hidden = false;
     private Boolean isSelected;
+    private int category;
 
    public int getDefaultValue(){
         return defaultValue;
@@ -51,6 +52,10 @@ public class Ingredient extends QuantityItem {
     public void setHidden(int hidden){
         this.hidden = ReturnBoolean(hidden);
     }
+
+    public int getCategory() { return category; }
+
+    public void setCategory(int category) { this.category = category; }
 
     private boolean ReturnBoolean(int value) {
         if (value == 0){
