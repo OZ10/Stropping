@@ -1,6 +1,9 @@
 package com.oz10.stropping;
 
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -26,7 +29,9 @@ import com.classes.Ingredient;
 import com.classes.QuantityItem;
 import com.classes.Recipe;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -42,9 +47,7 @@ public class RecipeEditActivity extends AppCompatActivity {
     private IngredientListAdapter _ingredientArrayAdapter;
 
     private ArrayList<Ingredient> _ingredientsList;
-    private Uri _photoURI;
 
-    ActionBar actionBar;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -102,17 +105,8 @@ public class RecipeEditActivity extends AppCompatActivity {
                 Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 // Ensure that there's a camera activity to handle the intent
                 if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-                    File photoFile = null;
-                    try {
-                        photoFile = createImageFile();
-                    } catch (IOException ex){
-                        //TODO
-                    }
-                    if (photoFile != null){
-                        _photoURI = FileProvider.getUriForFile(view.getContext(), "com.example.android.fileprovider", photoFile);
-                        takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, _photoURI);
-                        startActivityForResult(takePictureIntent, 2);
-                    }
+                    startActivityForResult(takePictureIntent, 2);
+//                    }
                 }
             }
         });
@@ -123,11 +117,7 @@ public class RecipeEditActivity extends AppCompatActivity {
 
     private void SetupActionbar()
     {
-//        Toolbar toolbar = (Toolbar) findViewById(R.id.edit_recipe_toolbar);
-//        toolbar.setTitle(_recipe.getName());
-//        setSupportActionBar(toolbar);
         ActionBar actionBar = getSupportActionBar();
-        //actionBar.setDisplayShowTitleEnabled(true);
         actionBar.setDisplayHomeAsUpEnabled(true);
     }
 
@@ -148,10 +138,41 @@ public class RecipeEditActivity extends AppCompatActivity {
                     _ingredientArrayAdapter.notifyDataSetChanged();
                     break;
                 case 2:
-                    _recipeImage.setImageURI(_photoURI);
-                    _recipe.setRecipeImage(_photoURI.toString());
+                    // Get the thumbnail bitmap from the return intent
+                    Bundle extras = data.getExtras();
+                    Bitmap imageBitmap = (Bitmap) extras.get("data");
+
+                    // Save the image
+                    String imageName = saveImage(imageBitmap, _recipe.getName(), "jpg");
+
+                    if (!imageName.equals("")){
+                        _recipe.setRecipeImage(imageName);
+                        _recipeImage.setImageBitmap(imageBitmap);
+                    }
+
                     break;
             }
+        }
+    }
+
+    public String saveImage(Bitmap b, String name, String extension){
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+
+        name=name+"."+extension;
+
+        File f = new File(storageDir, name);
+
+        try {
+            FileOutputStream out = new FileOutputStream(f);
+            b.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
+            out.close();
+
+            return f.getAbsolutePath();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "";
         }
     }
 
@@ -226,14 +247,4 @@ public class RecipeEditActivity extends AppCompatActivity {
         return ingredients;
     }
 
-    private File createImageFile() throws IOException{
-        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        File image = File.createTempFile(
-                "JPG_A",
-                ".jpg",
-                storageDir
-        );
-
-        return image;
-    }
 }

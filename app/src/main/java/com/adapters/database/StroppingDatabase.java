@@ -31,7 +31,7 @@ public class StroppingDatabase {
             DatabaseHelper.COLUMN_ESSENTIAL,
             DatabaseHelper.COLUMN_ADDED,
             DatabaseHelper.COLUMN_HIDDEN,
-            DatabaseHelper.COLUMN_CATEGORY};
+            DatabaseHelper.COLUMN_CATEGORYID};
 
     private String[] shoppingListTableAllColumns = {DatabaseHelper.COLUMN_ID,
             DatabaseHelper.COLUMN_INGREDIENTID,
@@ -171,7 +171,7 @@ public class StroppingDatabase {
         database.delete(DatabaseHelper.TABLE_RECIPES,null,null);
         database.delete(DatabaseHelper.TABLE_SHOPPINGLIST,null,null);
         database.delete(DatabaseHelper.TABLE_UOM,null,null);
-        database.delete(DatabaseHelper.TABLE_INGREDIENTCATEGORIES,null,null);
+        database.delete(DatabaseHelper.TABLE_CATEGORIES,null,null);
     }
 
     //Ingredients methods****************************************
@@ -219,7 +219,7 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, isEssential);
         values.put(DatabaseHelper.COLUMN_ADDED, isAdded);
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
-        values.put(DatabaseHelper.COLUMN_CATEGORY, category);
+        values.put(DatabaseHelper.COLUMN_CATEGORYID, category);
         long insertId = database.insert(DatabaseHelper.TABLE_INGREDIENTS, null,
                 values);
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS,
@@ -250,7 +250,7 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, isEssential);
         values.put(DatabaseHelper.COLUMN_ADDED, isAdded);
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
-        values.put(DatabaseHelper.COLUMN_CATEGORY, category);
+        values.put(DatabaseHelper.COLUMN_CATEGORYID, category);
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(id) });
     }
@@ -265,7 +265,7 @@ public class StroppingDatabase {
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, ingredient.getEssential());
         values.put(DatabaseHelper.COLUMN_ADDED, ingredient.getAdded());
         values.put(DatabaseHelper.COLUMN_HIDDEN, ingredient.getHidden());
-        values.put(DatabaseHelper.COLUMN_CATEGORY, ingredient.getCategory());
+        values.put(DatabaseHelper.COLUMN_CATEGORYID, ingredient.getCategory());
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(ingredient.getId()) });
     }

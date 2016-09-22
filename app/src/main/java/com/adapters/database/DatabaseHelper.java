@@ -14,14 +14,14 @@ public class DatabaseHelper extends SQLiteOpenHelper{
     public static final String TABLE_RECIPES = "recipes";
     public static final String TABLE_RECIPEINGREDIENTS = "recipeingredients";
     public static final String TABLE_UOM = "uom";
-    public static final String TABLE_INGREDIENTCATEGORIES = "ingredientsCategories";
+    public static final String TABLE_CATEGORIES = "ingredientsCategories";
 
     //COLUMN NAMES
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_INGREDIENTID = "ingredient_id";
     public static final String COLUMN_RECIPEID = "recipe_id";
     public static final String COLUMN_INGREDIENTNAME = "ingredientName";
-    public static final String COLUMN_CATEGORY = "ingredientCategory";
+    public static final String COLUMN_CATEGORYID = "categoryID";
     public static final String COLUMN_CATEGORYNAME = "categoryName";
     public static final String COLUMN_UOM = "uom";
     public static final String COLUMN_DEFAULTVALUE = "defaultvalue";
@@ -37,7 +37,7 @@ public class DatabaseHelper extends SQLiteOpenHelper{
     public static final String COLUMN_RECIPENOTES = "recipeNotes";
 
     private static final String DATABASE_NAME = "stropping.db";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     //Database creation SQL
     private static final String TABLE_INGREDIENTS_CREATE = "create table "
@@ -50,7 +50,7 @@ public class DatabaseHelper extends SQLiteOpenHelper{
             COLUMN_QUANTITY + " INTEGER, " +
             COLUMN_ADDED + " INTEGER, " +
             COLUMN_HIDDEN + " INTEGER, " +
-            COLUMN_CATEGORY + " TEXT);";
+            COLUMN_CATEGORYID + " TEXT);";
 
     private static final String TABLE_SHOPPINGLIST_CREATE = "create table "
             + TABLE_SHOPPINGLIST + "(" + COLUMN_ID + " integer primary key autoincrement, " +
@@ -75,8 +75,8 @@ public class DatabaseHelper extends SQLiteOpenHelper{
             + TABLE_UOM + "(" + COLUMN_ID + " integer primary key autoincrement, " +
             COLUMN_UOM + " text not null);";
 
-    private static final String TABLE_INGREDIENTCATEGORIES_CREATE = "create table "
-            + TABLE_INGREDIENTCATEGORIES + "(" + COLUMN_ID + " integer primary key autoincrement, " +
+    private static final String TABLE_CATEGORIES_CREATE = "create table "
+            + TABLE_CATEGORIES + "(" + COLUMN_ID + " integer primary key autoincrement, " +
             COLUMN_CATEGORYNAME + " text not null);";
 
     public DatabaseHelper(Context context) {
@@ -91,7 +91,7 @@ public class DatabaseHelper extends SQLiteOpenHelper{
         db.execSQL(TABLE_RECIPES_CREATE);
         db.execSQL(TABLE_RECIPEINGREDIENTS_CREATE);
         db.execSQL(TABLE_UOM_CREATE);
-        db.execSQL(TABLE_INGREDIENTCATEGORIES_CREATE);
+        db.execSQL(TABLE_CATEGORIES_CREATE);
     }
 
     @Override
@@ -104,7 +104,7 @@ public class DatabaseHelper extends SQLiteOpenHelper{
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_RECIPES);
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_RECIPEINGREDIENTS);
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_UOM);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_INGREDIENTCATEGORIES);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_CATEGORIES);
         onCreate(db);
     }
 }
