@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/constraintLayout">
 
     <EditText
         android:layout_width="wrap_content"
@@ -9,92 +13,158 @@
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="Ingredient Name"
         android:id="@+id/ingredient_edit_name"
-        android:layout_gravity="center_horizontal"
-        android:padding="10dp" />
+        android:padding="10dp"
+        android:layout_marginStart="16dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_marginLeft="16dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginRight="16dp"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_margin="10dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceMedium"
-            android:text="Quantity"
-            android:id="@+id/ingredient_edit_quantity"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:padding="10dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Quantity"
+        android:id="@+id/ingredient_edit_quantity"
+        android:padding="10dp"
+        app:layout_constraintTop_toBottomOf="@+id/ingredient_edit_category"
+        android:layout_marginStart="16dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_marginLeft="16dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceMedium"
-            android:text="UOM"
-            android:id="@+id/ingredient_edit_uom"
-            android:layout_below="@+id/ingredient_edit_quantity"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:padding="10dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="UOM"
+        android:id="@+id/ingredient_edit_uom"
+        android:padding="10dp"
+        tools:layout_conversion_absoluteX="10dp"
+        tools:layout_conversion_absoluteY="97dp"
+        tools:layout_conversion_absoluteWidth="59dp"
+        tools:layout_conversion_absoluteHeight="41dp"
+        app:layout_constraintTop_toBottomOf="@+id/ingredient_edit_quantity"
+        android:layout_marginStart="16dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_marginLeft="16dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceMedium"
-            android:text="Favourite"
-            android:id="@+id/ingredient_edit_favourite"
-            android:layout_below="@+id/ingredient_edit_uom"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:padding="10dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Favourite"
+        android:id="@+id/ingredient_edit_favourite"
+        android:padding="10dp"
+        tools:layout_conversion_absoluteX="10dp"
+        tools:layout_conversion_absoluteY="139dp"
+        tools:layout_conversion_absoluteWidth="95dp"
+        tools:layout_conversion_absoluteHeight="41dp"
+        app:layout_constraintTop_toBottomOf="@+id/ingredient_edit_uom"
+        android:layout_marginStart="16dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_marginLeft="16dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceMedium"
-            android:text="Essential"
-            android:id="@+id/ingredient_edit_essential"
-            android:layout_below="@+id/ingredient_edit_favourite"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:padding="10dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Essential"
+        android:id="@+id/ingredient_edit_essential"
+        android:padding="10dp"
+        tools:layout_conversion_absoluteX="10dp"
+        tools:layout_conversion_absoluteY="180dp"
+        tools:layout_conversion_absoluteWidth="93dp"
+        tools:layout_conversion_absoluteHeight="41dp"
+        app:layout_constraintTop_toBottomOf="@+id/ingredient_edit_favourite"
+        android:layout_marginStart="16dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_marginLeft="16dp" />
 
-        <EditText
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:inputType="number"
-            android:ems="2"
-            android:id="@+id/ingredient_edit_quantity_value"
-            android:layout_alignParentRight="true"
-            android:layout_alignParentEnd="true"
-            android:text="1" />
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:id="@+id/ingredient_edit_quantity_value"
+        android:text="1"
+        android:padding="10dp"
+        app:layout_constraintTop_toTopOf="@+id/ingredient_edit_quantity"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginRight="16dp" />
 
-        <Spinner
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/ingredient_edit_uom_value"
-            android:layout_below="@+id/ingredient_edit_quantity_value"
-            android:layout_alignParentRight="true"
-            android:layout_alignParentEnd="true" />
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/ingredient_edit_uom_value"
+        tools:layout_conversion_absoluteX="326dp"
+        tools:layout_conversion_absoluteY="98dp"
+        tools:layout_conversion_absoluteWidth="48dp"
+        tools:layout_conversion_absoluteHeight="24dp"
+        android:padding="20dp"
+        app:layout_constraintTop_toBottomOf="@+id/ingredient_edit_quantity"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginRight="16dp" />
 
-        <Switch
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/ingredient_edit_favourite_value"
-            android:layout_alignTop="@+id/ingredient_edit_favourite"
-            android:layout_alignParentRight="true"
-            android:layout_alignParentEnd="true" />
+    <Switch
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/ingredient_edit_favourite_value"
+        tools:layout_conversion_absoluteX="334dp"
+        tools:layout_conversion_absoluteY="139dp"
+        tools:layout_conversion_absoluteWidth="40dp"
+        tools:layout_conversion_absoluteHeight="27dp"
+        app:layout_constraintTop_toTopOf="@+id/ingredient_edit_essential"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginRight="16dp"
+        android:layout_marginTop="8dp" />
 
-        <Switch
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/ingredient_edit_essential_value"
-            android:layout_alignRight="@+id/ingredient_edit_favourite_value"
-            android:layout_alignEnd="@+id/ingredient_edit_favourite_value"
-            android:layout_alignTop="@+id/ingredient_edit_essential" />
+    <Switch
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/ingredient_edit_essential_value"
+        tools:layout_conversion_absoluteX="334dp"
+        tools:layout_conversion_absoluteY="180dp"
+        tools:layout_conversion_absoluteWidth="40dp"
+        tools:layout_conversion_absoluteHeight="27dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginRight="16dp"
+        app:layout_constraintTop_toTopOf="@+id/ingredient_edit_favourite"
+        android:layout_marginTop="8dp" />
 
-    </RelativeLayout>
+    <TextView
+        android:text="Category"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/ingredient_edit_category"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:elevation="1dp"
+        android:padding="10dp"
+        tools:layout_conversion_absoluteX="10dp"
+        tools:layout_conversion_absoluteY="222dp"
+        tools:layout_conversion_absoluteWidth="92dp"
+        tools:layout_conversion_absoluteHeight="41dp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@+id/ingredient_edit_name"
+        android:layout_marginStart="16dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_marginLeft="16dp" />
 
-</LinearLayout>
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/ingredient_edit_category_value"
+        android:padding="20dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/ingredient_edit_category"
+        android:layout_marginRight="16dp" />
+
+
+</android.support.constraint.ConstraintLayout>

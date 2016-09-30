@@ -5,15 +5,12 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Paint;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AlertDialog;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -99,18 +96,19 @@ public class IngredientListAdapter extends BaseAdapter {
 
         // set default views (common across all layouts)
         if (ingredient != null) {
-            SetIngredientName(view, ingredient.getName(), ingredient.getId(), parent);
-            SetIngredientQuantity(view, ingredient, parent);
+            setIngredientName(view, ingredient.getName(), ingredient.getId(), parent);
+            setIngredientQuantity(view, ingredient, parent);
 
             switch (_layoutResource){
                 case R.layout.item_shoppinglist:
                     break;
                 case R.layout.item_ingredient:
-                    SetIngredientIsSelected(view, (Ingredient)ingredient);
+                    setIngredientIsSelected(view, (Ingredient)ingredient);
+                    setIngredientCategory(view, (Ingredient)ingredient);
                     break;
 
                 case R.layout.item_recipe_ingredient:
-                    SetIngredientDeleteButton(view, (Ingredient)ingredient);
+                    setIngredientDeleteButton(view, (Ingredient)ingredient);
                     break;
             }
         }
@@ -118,7 +116,7 @@ public class IngredientListAdapter extends BaseAdapter {
         return view;
     }
 
-    private void SetIngredientName(View view, final String ingredientName, final Long ingredientId, final ViewGroup parent)
+    private void setIngredientName(View view, final String ingredientName, final Long ingredientId, final ViewGroup parent)
     {
         final TextView textView = (TextView) view.findViewById(R.id.ingredient_name);
         textView.setOnClickListener(new View.OnClickListener(){
@@ -149,16 +147,12 @@ public class IngredientListAdapter extends BaseAdapter {
         textView.setText(ingredientName);
     }
 
-    private void SetIngredientQuantity(View view, final QuantityItem ingredient, final ViewGroup parent)
+    private void setIngredientQuantity(View view, final QuantityItem ingredient, final ViewGroup parent)
     {
         final TextView textView = (TextView) view.findViewById(R.id.ingredient_quantity);
         textView.setOnClickListener(new View.OnClickListener(){
                                         @Override
                                         public void onClick(View view) {
-                                            //TODO Open Edit ingredient activity
-//                                            Snackbar snackbar = Snackbar.make(parent, ingredientQuantity + " required!", Snackbar.LENGTH_SHORT);
-//                                            snackbar.show();
-
                                             final FrameLayout parent = SetupDialogView(ingredient);
 
                                             AlertDialog.Builder builder = new AlertDialog.Builder(_parentContent);
@@ -196,12 +190,17 @@ public class IngredientListAdapter extends BaseAdapter {
         textView.setText(ingredient.getQuantityText());
     }
 
+    private void setIngredientCategory(View view, Ingredient ingredient){
+        TextView textView = (TextView) view.findViewById(R.id.ingredient_category);
+        textView.setText(ingredient.getCategory().getName());
+    }
+
     private FrameLayout SetupDialogView(QuantityItem ingredient){
         final FrameLayout parent = new FrameLayout(_parentContent);
 
         int currentValue = ingredient.getQuantity();
 
-        if (ingredient.getUOM().equals("number of")){
+        if (ingredient.getUOM().getName().equals("number of")){
             int minValue = 1; //currentValue < 21 ? 1 : currentValue - 20;
             int maxValue = currentValue + 50;
 
@@ -222,8 +221,9 @@ public class IngredientListAdapter extends BaseAdapter {
             editText.setText(String.valueOf(currentValue));
             editText.setInputType(InputType.TYPE_CLASS_NUMBER);
 
+            // UOM Short value textview -- 500g
             TextView textView = new TextView(_parentContent);
-            textView.setText(ingredient.getUOM());
+            textView.setText(ingredient.getUOM().getShortName());
 
             LinearLayout linearLayout = new LinearLayout(_parentContent);
             linearLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -240,7 +240,7 @@ public class IngredientListAdapter extends BaseAdapter {
     }
 
     private int getSelectedValue(QuantityItem ingredient, FrameLayout frameLayout){
-        if (ingredient.getUOM().equals("number of")) {
+        if (ingredient.getUOM().getName().equals("number of")) {
             NumberPicker numberPicker = (NumberPicker) frameLayout.findViewById(R.id.quantityvalue);
             return numberPicker.getValue();
         }else{
@@ -249,7 +249,7 @@ public class IngredientListAdapter extends BaseAdapter {
         }
     }
 
-    private void SetIngredientIsSelected(View view, final Ingredient ingredient)
+    private void setIngredientIsSelected(View view, final Ingredient ingredient)
     {
         CheckBox checkBox = (CheckBox) view.findViewById(R.id.ingredient_isselected);
         checkBox.setOnClickListener(new View.OnClickListener(){
@@ -269,7 +269,7 @@ public class IngredientListAdapter extends BaseAdapter {
         checkBox.setChecked(ingredient.getIsSelected());
     }
 
-    private void SetIngredientDeleteButton(View view, final Ingredient ingredient)
+    private void setIngredientDeleteButton(View view, final Ingredient ingredient)
     {
         Button button = (Button) view.findViewById(R.id.ingredient_delete);
         button.setOnClickListener(new View.OnClickListener() {

@@ -1,6 +1,7 @@
 package com.oz10.stropping;
 
 import android.content.Intent;
+import android.os.BaseBundle;
 import android.support.v7.app.AppCompatActivity;
 
 import android.os.Bundle;
@@ -15,8 +16,10 @@ import android.view.MenuItem;
 import com.adapters.IngredientListAdapter;
 import com.adapters.RecipeListAdapter;
 import com.adapters.database.StroppingDatabase;
+import com.classes.BaseItem;
 import com.classes.Ingredient;
 import com.classes.QuantityItem;
+import com.classes.UOM;
 import com.roughike.bottombar.BottomBar;
 import com.roughike.bottombar.OnMenuTabClickListener;
 
@@ -46,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
         SetupBottomBar(savedInstanceState);
         
-//        SetupDatabase();
+        //SetupDatabase();
     }
 
     private void SetupToolbar()
@@ -198,18 +201,35 @@ public class MainActivity extends AppCompatActivity {
 
         db = new StroppingDatabase(this);
         db.open();
+        
+        UOM uomNumberof = db.createUOM("number of", "x");
+        UOM uomGrams = db.createUOM("grams", "g");
+        db.createUOM("kilograms", "kg");
+        db.createUOM("liters", "l");
+        db.createUOM("milliliters", "ml");
+        db.createUOM("pints", "pts");
+
+        BaseItem cat = db.createCategory("Misc");
+        db.createCategory("Vegetable");
+        db.createCategory("Fruit");
+        db.createCategory("Poultry");
+        db.createCategory("Red Meat");
+        db.createCategory("Dairy");
+        db.createCategory("Bakery");
+        db.createCategory("Tinned Goods");
+        db.createCategory("Store Cupboard");
 
         ArrayList<QuantityItem> ingredientArrayList = new ArrayList<>();
 
-        Ingredient i_RedPepper = db.createIngredient("Red Pepper", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_Garlic = db.createIngredient("Garlic", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_RedOnion = db.createIngredient("Red Onion", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_Parsley = db.createIngredient("Parsley", "grams", 10, 10, 0, 0, 0, 0, 0);
-        Ingredient i_SmallTomato = db.createIngredient("Small Tomato", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_SaladOnions = db.createIngredient("Salad Onions", "number of", 6, 6, 0, 0, 0, 0, 0);
-        Ingredient i_BrownRice = db.createIngredient("Brown Rice", "grams", 500, 500, 0, 0, 0, 0, 0);
-        Ingredient i_ChickenSC = db.createIngredient("Chicken Stock cube", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_Sausages = db.createIngredient("Turkey Sausages", "number of", 8, 8, 0, 0, 0, 0, 0);
+        Ingredient i_RedPepper = db.createIngredient("Red Pepper", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Garlic = db.createIngredient("Garlic", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_RedOnion = db.createIngredient("Red Onion", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Parsley = db.createIngredient("Parsley", uomGrams.getId(), 10, 10, 0, 0, 0, 0, cat.getId());
+        Ingredient i_SmallTomato = db.createIngredient("Small Tomato", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_SaladOnions = db.createIngredient("Salad Onions", uomNumberof.getId(), 6, 6, 0, 0, 0, 0, cat.getId());
+        Ingredient i_BrownRice = db.createIngredient("Brown Rice", uomGrams.getId(), 500, 500, 0, 0, 0, 0, cat.getId());
+        Ingredient i_ChickenSC = db.createIngredient("Chicken Stock cube", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Sausages = db.createIngredient("Turkey Sausages", uomNumberof.getId(), 8, 8, 0, 0, 0, 0, cat.getId());
 
         ingredientArrayList.add(i_RedPepper);
         ingredientArrayList.add(i_Garlic);
@@ -224,12 +244,12 @@ public class MainActivity extends AppCompatActivity {
         
         ingredientArrayList.clear();
         
-        Ingredient i_Onion = db.createIngredient("Onion", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_Mince = db.createIngredient("Turkey Mince", "grams", 500, 500, 0, 0, 0, 0, 0);
-        Ingredient i_ChoppedToms = db.createIngredient("Chopped Tomatoes", "grams", 250, 250, 0, 0, 0, 0, 0);
-        Ingredient i_Spag = db.createIngredient("Spag", "grams", 200, 200, 0, 0, 0, 0, 0);
-        Ingredient i_Carrot = db.createIngredient("Carrot", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_Celery = db.createIngredient("Celery", "number of", 1, 1, 0, 0, 0, 0, 0);
+        Ingredient i_Onion = db.createIngredient("Onion", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Mince = db.createIngredient("Turkey Mince", uomGrams.getId(), 500, 500, 0, 0, 0, 0, cat.getId());
+        Ingredient i_ChoppedToms = db.createIngredient("Chopped Tomatoes", uomGrams.getId(), 250, 250, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Spag = db.createIngredient("Spag", uomGrams.getId(), 200, 200, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Carrot = db.createIngredient("Carrot", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Celery = db.createIngredient("Celery", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
         
         ingredientArrayList.add(i_RedPepper);
         i_Onion.setQuantity(2);
@@ -246,16 +266,16 @@ public class MainActivity extends AppCompatActivity {
         
         ingredientArrayList.clear();
         
-        Ingredient i_BlackBeans = db.createIngredient("Black Beans", "grams", 200, 200, 0, 0, 0, 0, 0);
-        Ingredient i_GroundCumin = db.createIngredient("Ground Cumin", "grams", 10, 10, 0, 0, 0, 0, 0);
-        Ingredient i_GroundCinnamon = db.createIngredient("Ground Cinnamon", "grams", 10, 10, 0, 0, 0, 0, 0);
-        Ingredient i_ChipotlePaste = db.createIngredient("Chipotle Paste", "grams", 50, 50, 0, 0, 0, 0, 0);
-        Ingredient i_CherryToms = db.createIngredient("Cherry Tomatoes", "number of", 30, 30, 0, 0, 0, 0, 0);
-        Ingredient i_RedChilli = db.createIngredient("Red Chilli", "number of", 2, 2, 0, 0, 0, 0, 0);
-        Ingredient i_Apple = db.createIngredient("Apple", "number of", 6, 6, 0, 0, 0, 0, 0);
-        Ingredient i_GemLettuce = db.createIngredient("Gem Lettuce", "number of", 1, 1, 0, 0, 0, 0, 0);
-        Ingredient i_Raddish = db.createIngredient("Raddishes", "number of", 20, 20, 0, 0, 0, 0, 0);
-        Ingredient i_SourCream = db.createIngredient("Sour Cream", "grams", 50, 50, 0, 0, 0, 0, 0);
+        Ingredient i_BlackBeans = db.createIngredient("Black Beans", uomGrams.getId(), 200, 200, 0, 0, 0, 0, cat.getId());
+        Ingredient i_GroundCumin = db.createIngredient("Ground Cumin", uomGrams.getId(), 10, 10, 0, 0, 0, 0, cat.getId());
+        Ingredient i_GroundCinnamon = db.createIngredient("Ground Cinnamon", uomGrams.getId(), 10, 10, 0, 0, 0, 0, cat.getId());
+        Ingredient i_ChipotlePaste = db.createIngredient("Chipotle Paste", uomGrams.getId(), 50, 50, 0, 0, 0, 0, cat.getId());
+        Ingredient i_CherryToms = db.createIngredient("Cherry Tomatoes", uomNumberof.getId(), 30, 30, 0, 0, 0, 0, cat.getId());
+        Ingredient i_RedChilli = db.createIngredient("Red Chilli", uomNumberof.getId(), 2, 2, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Apple = db.createIngredient("Apple", uomNumberof.getId(), 6, 6, 0, 0, 0, 0, cat.getId());
+        Ingredient i_GemLettuce = db.createIngredient("Gem Lettuce", uomNumberof.getId(), 1, 1, 0, 0, 0, 0, cat.getId());
+        Ingredient i_Raddish = db.createIngredient("Raddishes", uomNumberof.getId(), 20, 20, 0, 0, 0, 0, cat.getId());
+        Ingredient i_SourCream = db.createIngredient("Sour Cream", uomGrams.getId(), 50, 50, 0, 0, 0, 0, cat.getId());
         
         i_Garlic.setQuantity(2);
         ingredientArrayList.add(i_Garlic);
@@ -275,7 +295,7 @@ public class MainActivity extends AppCompatActivity {
         ingredientArrayList.add(i_SourCream);
         
         db.createRecipe("Veggie Fajitas", 2, "", "", ingredientArrayList);
-        
+
         db.close();
     }
 

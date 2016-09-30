@@ -6,14 +6,17 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 
+import com.classes.BaseItem;
 import com.classes.Ingredient;
 import com.classes.QuantityItem;
 import com.classes.Recipe;
 import com.classes.ShoppingListItem;
+import com.classes.UOM;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Locale;
 
 /**
  * Created by Austen on 15/08/2016.
@@ -24,7 +27,7 @@ public class StroppingDatabase {
     private DatabaseHelper dbHelper;
     private String[] ingredientsTableAllColumns = {DatabaseHelper.COLUMN_ID,
             DatabaseHelper.COLUMN_INGREDIENTNAME,
-            DatabaseHelper.COLUMN_UOM,
+            DatabaseHelper.COLUMN_UOMID,
             DatabaseHelper.COLUMN_DEFAULTVALUE,
             DatabaseHelper.COLUMN_QUANTITY,
             DatabaseHelper.COLUMN_FAVOURITE,
@@ -48,6 +51,13 @@ public class StroppingDatabase {
             DatabaseHelper.COLUMN_RECIPEID,
             DatabaseHelper.COLUMN_INGREDIENTID,
             DatabaseHelper.COLUMN_QUANTITY};
+
+    private String[] UOMAllColumns = {DatabaseHelper.COLUMN_ID,
+            DatabaseHelper.COLUMN_UOM,
+            DatabaseHelper.COLUMN_UOMSHORT};
+
+    private String[] CategoriesAllColumns = {DatabaseHelper.COLUMN_ID,
+            DatabaseHelper.COLUMN_CATEGORYNAME};
 
     //TODO This needs to be renamed
     private static StroppingDatabase db = null;
@@ -73,7 +83,21 @@ public class StroppingDatabase {
         return db;
     }
 
-    //ShoppingList methods****************************************
+    public void DeleteAllRowsFromTable(String tableName) {
+        database.delete(tableName, null, null);
+    }
+
+    public void ResetAllTables()
+    {
+        database.delete(DatabaseHelper.TABLE_INGREDIENTS,null,null);
+        database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS,null,null);
+        database.delete(DatabaseHelper.TABLE_RECIPES,null,null);
+        database.delete(DatabaseHelper.TABLE_SHOPPINGLIST,null,null);
+        database.delete(DatabaseHelper.TABLE_UOM,null,null);
+        database.delete(DatabaseHelper.TABLE_CATEGORIES,null,null);
+    }
+
+    //region SHOPPINGLIST METHODS
     public ShoppingListItem createShoppingListItem(long ingredientId, int quantity, int isPurchased){
         
         // Check if ingredient has already been added to the shopping list
@@ -148,6 +172,16 @@ public class StroppingDatabase {
             cursor.moveToNext();
         }
         cursor.close();
+
+//        // Sort list
+//        //TODO Make this a generic call that can be used by any method
+//        Collections.sort(shoppingListItems, new Comparator<Ingredient>(){
+//            @Override
+//            public int compare(Ingredient i1, Ingredient i2){
+//                return i1.getName().compareToIgnoreCase(i2.getName());
+//            }
+//        });
+
         return shoppingListItems;
     }
 
@@ -160,21 +194,9 @@ public class StroppingDatabase {
                 new String[] { String.valueOf(shoppingListItem.getId()) });
     }
 
-    public void DeleteAllRowsFromTable(String tableName) {
-        database.delete(tableName, null, null);
-    }
+    //endregion
 
-    public void ResetAllTables()
-    {
-        database.delete(DatabaseHelper.TABLE_INGREDIENTS,null,null);
-        database.delete(DatabaseHelper.TABLE_RECIPEINGREDIENTS,null,null);
-        database.delete(DatabaseHelper.TABLE_RECIPES,null,null);
-        database.delete(DatabaseHelper.TABLE_SHOPPINGLIST,null,null);
-        database.delete(DatabaseHelper.TABLE_UOM,null,null);
-        database.delete(DatabaseHelper.TABLE_CATEGORIES,null,null);
-    }
-
-    //Ingredients methods****************************************
+    //region INGREDIENT METHODS
     private String getIngredientNameFromId(long ingredientId){
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS, ingredientsTableAllColumns,
                 null, null, null, null, null);
@@ -209,17 +231,17 @@ public class StroppingDatabase {
         return null;
     }
 
-    public Ingredient createIngredient(String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden, int category){
+    public Ingredient createIngredient(String name, Long uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden, Long categoryId){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, name);
-        values.put(DatabaseHelper.COLUMN_UOM, uom);
+        values.put(DatabaseHelper.COLUMN_UOMID, uom);
         values.put(DatabaseHelper.COLUMN_DEFAULTVALUE, defaultValue);
         values.put(DatabaseHelper.COLUMN_QUANTITY, quantity);
         values.put(DatabaseHelper.COLUMN_FAVOURITE, isFavourite);
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, isEssential);
         values.put(DatabaseHelper.COLUMN_ADDED, isAdded);
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
-        values.put(DatabaseHelper.COLUMN_CATEGORYID, category);
+        values.put(DatabaseHelper.COLUMN_CATEGORYID, categoryId);
         long insertId = database.insert(DatabaseHelper.TABLE_INGREDIENTS, null,
                 values);
         Cursor cursor = database.query(DatabaseHelper.TABLE_INGREDIENTS,
@@ -240,17 +262,17 @@ public class StroppingDatabase {
                 + " = " + id, null);
     }
 
-    public void updateIngredient(long id, String name, String uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden, int category){
+    public void updateIngredient(long id, String name, Long uom, int defaultValue, int quantity, int isFavourite, int isEssential, int isAdded, int isHidden, Long categoryId){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, name);
-        values.put(DatabaseHelper.COLUMN_UOM, uom);
+        values.put(DatabaseHelper.COLUMN_UOMID, uom);
         values.put(DatabaseHelper.COLUMN_DEFAULTVALUE, defaultValue);
         values.put(DatabaseHelper.COLUMN_QUANTITY, quantity);
         values.put(DatabaseHelper.COLUMN_FAVOURITE, isFavourite);
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, isEssential);
         values.put(DatabaseHelper.COLUMN_ADDED, isAdded);
         values.put(DatabaseHelper.COLUMN_HIDDEN, isHidden);
-        values.put(DatabaseHelper.COLUMN_CATEGORYID, category);
+        values.put(DatabaseHelper.COLUMN_CATEGORYID, categoryId);
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(id) });
     }
@@ -258,14 +280,14 @@ public class StroppingDatabase {
     public void updateIngredient(Ingredient ingredient){
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COLUMN_INGREDIENTNAME, ingredient.getName());
-        values.put(DatabaseHelper.COLUMN_UOM, ingredient.getUOM());
+        values.put(DatabaseHelper.COLUMN_UOMID, ingredient.getUOM().getId());
         values.put(DatabaseHelper.COLUMN_DEFAULTVALUE, ingredient.getDefaultValue());
         values.put(DatabaseHelper.COLUMN_QUANTITY, ingredient.getQuantity());
         values.put(DatabaseHelper.COLUMN_FAVOURITE, ingredient.getFavourite());
         values.put(DatabaseHelper.COLUMN_ESSENTIAL, ingredient.getEssential());
         values.put(DatabaseHelper.COLUMN_ADDED, ingredient.getAdded());
         values.put(DatabaseHelper.COLUMN_HIDDEN, ingredient.getHidden());
-        values.put(DatabaseHelper.COLUMN_CATEGORYID, ingredient.getCategory());
+        values.put(DatabaseHelper.COLUMN_CATEGORYID, ingredient.getCategory().getId());
         database.update(DatabaseHelper.TABLE_INGREDIENTS, values, DatabaseHelper.COLUMN_ID + " = ?",
                 new String[] { String.valueOf(ingredient.getId()) });
     }
@@ -300,18 +322,19 @@ public class StroppingDatabase {
         Ingredient ingredient = new Ingredient();
         ingredient.setId(cursor.getLong(0));
         ingredient.setName(cursor.getString(1));
-        ingredient.setUOM(cursor.getString(2));
+        ingredient.setUOM(getUOMById(cursor.getLong(2)));
         ingredient.setDefaultValue(cursor.getInt(3));
         ingredient.setQuantity(cursor.getInt(4));
         ingredient.setFavourite(cursor.getInt(5));
         ingredient.setEssential(cursor.getInt(6));
         ingredient.setadded(cursor.getInt(7));
         ingredient.setHidden(cursor.getInt(8));
-        ingredient.setCategory(cursor.getInt(9));
+        ingredient.setCategory(getCategoryById(cursor.getLong(9)));
         return ingredient;
     }
+    //endregion
 
-    //Recipes methods****************************************
+    //region RECIPE METHODS
     public ArrayList<Recipe> getAllRecipes(){
         ArrayList<Recipe> recipes = new ArrayList<Recipe>();
 
@@ -450,26 +473,108 @@ public class StroppingDatabase {
         }
     }
 
-    private CharSequence convertString(String convertString) {
+    //endregion
 
-        if (convertString.equals("number of")) {
-            return "";
-        }
-        else if (convertString.equals("grams")) {
-            return "g";
-        }
-        else if (convertString.equals("kilograms")) {
-            return "kg";
-        }
-        else if (convertString.equals("liters")) {
-            return "l";
-        }
-        else if (convertString.equals("milliliters")) {
-            return "ml";
-        }
-        else if (convertString.equals("pints")) {
-            return "pt";
-        }
-        return convertString;
+    //region UOM METHODS
+
+    public UOM createUOM(String uomName, String uomNameShort){
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COLUMN_UOM, uomName);
+        values.put(DatabaseHelper.COLUMN_UOMSHORT, uomNameShort);
+
+        long insertId = database.insert(DatabaseHelper.TABLE_UOM, null,
+                values);
+
+        UOM uom = getUOMById(insertId);
+        return uom;
     }
+
+    public UOM getUOMById(long id){
+        Cursor cursor = database.query(DatabaseHelper.TABLE_UOM, UOMAllColumns, DatabaseHelper.COLUMN_ID + "=" + id, null, null, null, null);
+        cursor.moveToFirst();
+        UOM uom = new UOM();
+        uom.setId(id);
+        uom.setName(cursor.getString(1));
+        uom.setShortName(cursor.getString(2));
+        cursor.close();
+        return uom;
+    }
+
+    public UOM getUOMByName(String uomName){
+        Cursor cursor = database.query(DatabaseHelper.TABLE_UOM, UOMAllColumns, DatabaseHelper.COLUMN_UOM + "='" + uomName + "'", null, null, null, null);
+        cursor.moveToFirst();
+        UOM uom = new UOM();
+        uom.setId(cursor.getLong(0));
+        uom.setName(cursor.getString(1));
+        uom.setShortName(cursor.getString(2));
+        cursor.close();
+        return uom;
+    }
+
+    public ArrayList<String> getAllUOMNames(){
+        ArrayList<String> uomList = new ArrayList<>();
+        Cursor cursor = database.query(DatabaseHelper.TABLE_UOM, UOMAllColumns,
+                null, null, null, null, null);
+
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()){
+            UOM uom = getUOMById(cursor.getInt(0));
+            uomList.add(uom.getName());
+            cursor.moveToNext();
+        }
+        cursor.close();
+        return uomList;
+    }
+
+    //endregion
+
+    //region CATEGORY METHODS
+
+    public BaseItem createCategory(String categoryName){
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COLUMN_CATEGORYNAME, categoryName);
+
+        long insertId = database.insert(DatabaseHelper.TABLE_CATEGORIES, null,
+                values);
+
+        BaseItem category = getCategoryById(insertId);
+        return category;
+    }
+
+    public BaseItem getCategoryById(long id){
+        Cursor cursor = database.query(DatabaseHelper.TABLE_CATEGORIES, CategoriesAllColumns, DatabaseHelper.COLUMN_ID + "=" + id, null, null, null, null);
+        cursor.moveToFirst();
+        BaseItem category = new BaseItem();
+        category.setId(id);
+        category.setName(cursor.getString(1));
+        cursor.close();
+        return category;
+    }
+
+    public BaseItem getCategoryByName(String categoryName){
+        Cursor cursor = database.query(DatabaseHelper.TABLE_CATEGORIES, CategoriesAllColumns, DatabaseHelper.COLUMN_CATEGORYNAME + "='" + categoryName + "'", null, null, null, null);
+        cursor.moveToFirst();
+        BaseItem category = new UOM();
+        category.setId(cursor.getLong(0));
+        category.setName(cursor.getString(1));
+        cursor.close();
+        return category;
+    }
+
+    public ArrayList<String> getAllCategoryNames(){
+        ArrayList<String> categoryList = new ArrayList<>();
+        Cursor cursor = database.query(DatabaseHelper.TABLE_CATEGORIES, CategoriesAllColumns,
+                null, null, null, null, null);
+
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()){
+            BaseItem category = getCategoryById(cursor.getInt(0));
+            categoryList.add(category.getName());
+            cursor.moveToNext();
+        }
+        cursor.close();
+        return categoryList;
+    }
+
+    //endregion
 }

@@ -1,15 +1,16 @@
 package com.classes;
 
 public class QuantityItem extends BaseItem {
-    private String uom;
+    private UOM uom;
     private int quantity;
     private String quantityText;
-    
-    public String getUOM(){
+//    private BaseItem category;
+
+    public UOM getUOM(){
         return uom;
     }
 
-    public void setUOM(String uom){
+    public void setUOM(UOM uom){
         this.uom = uom;
     }
 
@@ -19,7 +20,7 @@ public class QuantityItem extends BaseItem {
 
     public void setQuantity(int quantity){
         this.quantity = quantity;
-        this.setQuantityText(convertUOM(getUOM()));
+        this.setQuantityText(convertUOM(this.uom));
     }
 
     public String getQuantityText(){
@@ -30,34 +31,29 @@ public class QuantityItem extends BaseItem {
         this.quantityText = quantityText;
     }
 
+//    public BaseItem getCategory(){
+//        return category;
+//    }
+//
+//    public void setCategory(BaseItem value){
+//        category = value;
+//    }
+
    @Override
     public String toString()
     {
         return name;
     }
 
-    private String convertUOM(String uom) {
+    private String convertUOM(UOM uom) {
 
-        String quantity = Integer.toString(getQuantity());
+        String quantity = Integer.toString(this.quantity);
 
-        if (uom.equals("number of")) {
-            return "x" + quantity;
+        if (uom.getName().equals("number of")) {
+            return uom.getShortName() + quantity;
+        } else {
+            return quantity + uom.getShortName();
         }
-        else if (uom.equals("grams")) {
-            return quantity + "g";
-        }
-        else if (uom.equals("kilograms")) {
-            return quantity + "kg";
-        }
-        else if (uom.equals("liters")) {
-            return quantity + "l";
-        }
-        else if (uom.equals("milliliters")) {
-            return quantity + "ml";
-        }
-        else if (uom.equals("pints")) {
-            return quantity + "pt";
-        }
-        return uom;
+        //return uom;
     }
 }

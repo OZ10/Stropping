@@ -23,7 +23,9 @@ public class DatabaseHelper extends SQLiteOpenHelper{
     public static final String COLUMN_INGREDIENTNAME = "ingredientName";
     public static final String COLUMN_CATEGORYID = "categoryID";
     public static final String COLUMN_CATEGORYNAME = "categoryName";
+    public static final String COLUMN_UOMID = "uomid";
     public static final String COLUMN_UOM = "uom";
+    public static final String COLUMN_UOMSHORT = "uomshort";
     public static final String COLUMN_DEFAULTVALUE = "defaultvalue";
     public static final String COLUMN_FAVOURITE = "favourite";
     public static final String COLUMN_ESSENTIAL = "essential";
@@ -37,20 +39,20 @@ public class DatabaseHelper extends SQLiteOpenHelper{
     public static final String COLUMN_RECIPENOTES = "recipeNotes";
 
     private static final String DATABASE_NAME = "stropping.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 5;
 
     //Database creation SQL
     private static final String TABLE_INGREDIENTS_CREATE = "create table "
             + TABLE_INGREDIENTS + "(" + COLUMN_ID + " integer primary key autoincrement, " +
             COLUMN_INGREDIENTNAME + " text not null, " +
-            COLUMN_UOM + " text not null, " +
+            COLUMN_UOMID + " INTEGER, " +
             COLUMN_DEFAULTVALUE + " INTEGER, " +
             COLUMN_FAVOURITE + " INTEGER, " +
             COLUMN_ESSENTIAL + " INTEGER, " +
             COLUMN_QUANTITY + " INTEGER, " +
             COLUMN_ADDED + " INTEGER, " +
             COLUMN_HIDDEN + " INTEGER, " +
-            COLUMN_CATEGORYID + " TEXT);";
+            COLUMN_CATEGORYID + " INTEGER);";
 
     private static final String TABLE_SHOPPINGLIST_CREATE = "create table "
             + TABLE_SHOPPINGLIST + "(" + COLUMN_ID + " integer primary key autoincrement, " +
@@ -73,7 +75,8 @@ public class DatabaseHelper extends SQLiteOpenHelper{
 
     private static final String TABLE_UOM_CREATE = "create table "
             + TABLE_UOM + "(" + COLUMN_ID + " integer primary key autoincrement, " +
-            COLUMN_UOM + " text not null);";
+            COLUMN_UOM + " text not null, " +
+            COLUMN_UOMSHORT + " text not null);";
 
     private static final String TABLE_CATEGORIES_CREATE = "create table "
             + TABLE_CATEGORIES + "(" + COLUMN_ID + " integer primary key autoincrement, " +

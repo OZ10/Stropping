@@ -12,12 +12,57 @@
     </item>
     <item
         is-multidex="true"
-        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support.constraint\constraint-layout\1.0.0-alpha1\jars\classes.jar"
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\support-v4\24.1.1\jars\classes.jar"
         jumboMode="true"
         optimize="true"
         revision="24.0.1"
-        sha1="ea579447f9afb1fbcb28e150e1cd4bfe7f56e75b">
-        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support.constraint-constraint-layout-1.0.0-alpha1_04420cea59e718519fe5aa6ece94f4f37d8eee3f\classes.dex" />
+        sha1="6d7d803871e3203465f71a163e7af104f807b446">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-support-v4-24.1.1_d8263ec8cdc48735334dcef94ac0f8f811c8039b\classes.dex" />
+    </item>
+    <item
+        is-multidex="true"
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support.constraint\constraint-layout\1.0.0-alpha9\jars\classes.jar"
+        jumboMode="true"
+        optimize="true"
+        revision="24.0.1"
+        sha1="f2b64f6a762f61a2379d6a79af03e2ee56eefe0b">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support.constraint-constraint-layout-1.0.0-alpha9_77f4052bb8f498af4ff15728210503d12fc8bd88\classes.dex" />
+    </item>
+    <item
+        is-multidex="true"
+        jar="E:\Users\Austen\AppData\Local\Android\sdk\extras\m2repository\com\android\support\constraint\constraint-layout-solver\1.0.0-alpha9\constraint-layout-solver-1.0.0-alpha9.jar"
+        jumboMode="true"
+        optimize="true"
+        revision="24.0.1"
+        sha1="6a908fd0803cc5f65b007101002aec06dc7544da">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\constraint-layout-solver-1.0.0-alpha9_b28163620de68c7228466f7fd1dbcee5886366c3\classes.dex" />
+    </item>
+    <item
+        is-multidex="true"
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\incremental-runtime-classes\debug\instant-run.jar"
+        jumboMode="true"
+        optimize="true"
+        revision="24.0.1"
+        sha1="feb2d5c1ceb2c0b28b87366d51d987c50d3c57d4">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\instant-run_396249258bd060b1b5deede0f748dc9ce2222408\classes.dex" />
+    </item>
+    <item
+        is-multidex="true"
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\cardview-v7\24.0.0\jars\classes.jar"
+        jumboMode="true"
+        optimize="true"
+        revision="24.0.1"
+        sha1="8dd49930e4f9dde1a42d37e362b9fea8b1b69c0d">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-cardview-v7-24.0.0_97083e5f3acc4161b825719d640680650513c766\classes.dex" />
+    </item>
+    <item
+        is-multidex="true"
+        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\incremental-classes\debug\instant-run-bootstrap.jar"
+        jumboMode="true"
+        optimize="true"
+        revision="24.0.1"
+        sha1="49e55e8a9a8a5aa89e9d623b3e5eff87e1d8a36b">
+        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\instant-run-bootstrap_a5940714a7d079ec30f4166eec998e56db83d1a2\classes.dex" />
     </item>
     <item
         is-multidex="true"
@@ -39,15 +84,6 @@
     </item>
     <item
         is-multidex="true"
-        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\support-v4\24.1.1\jars\classes.jar"
-        jumboMode="true"
-        optimize="true"
-        revision="24.0.1"
-        sha1="6d7d803871e3203465f71a163e7af104f807b446">
-        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-support-v4-24.1.1_d8263ec8cdc48735334dcef94ac0f8f811c8039b\classes.dex" />
-    </item>
-    <item
-        is-multidex="true"
         jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\appcompat-v7\24.1.1\jars\classes.jar"
         jumboMode="true"
         optimize="true"
@@ -57,48 +93,12 @@
     </item>
     <item
         is-multidex="true"
-        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\incremental-runtime-classes\debug\instant-run.jar"
-        jumboMode="true"
-        optimize="true"
-        revision="24.0.1"
-        sha1="c061c19a60d63985480a2bd21e2a08e0dbdd2a2f">
-        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\instant-run_396249258bd060b1b5deede0f748dc9ce2222408\classes.dex" />
-    </item>
-    <item
-        is-multidex="true"
-        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\cardview-v7\24.0.0\jars\classes.jar"
-        jumboMode="true"
-        optimize="true"
-        revision="24.0.1"
-        sha1="8dd49930e4f9dde1a42d37e362b9fea8b1b69c0d">
-        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-cardview-v7-24.0.0_97083e5f3acc4161b825719d640680650513c766\classes.dex" />
-    </item>
-    <item
-        is-multidex="true"
         jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\exploded-aar\com.android.support\animated-vector-drawable\24.1.1\jars\classes.jar"
         jumboMode="true"
         optimize="true"
         revision="24.0.1"
         sha1="c936c1bd42f0c018c18920c7bec619ef056b24f8">
         <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\com.android.support-animated-vector-drawable-24.1.1_6be6916c1d1e5fbcfb0919a193fb6c533b8fd87f\classes.dex" />
-    </item>
-    <item
-        is-multidex="true"
-        jar="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\incremental-classes\debug\instant-run-bootstrap.jar"
-        jumboMode="true"
-        optimize="true"
-        revision="24.0.1"
-        sha1="7a7740f5e09290ab75b728f5f23b4b8ceacbfd5a">
-        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\instant-run-bootstrap_a5940714a7d079ec30f4166eec998e56db83d1a2\classes.dex" />
-    </item>
-    <item
-        is-multidex="true"
-        jar="E:\Users\Austen\AppData\Local\Android\sdk\extras\android\m2repository\com\android\support\constraint\constraint-layout-solver\1.0.0-alpha1\constraint-layout-solver-1.0.0-alpha1.jar"
-        jumboMode="true"
-        optimize="true"
-        revision="24.0.1"
-        sha1="78d61c347aa5002119e3c17bffcbebf28fe07b0b">
-        <dex dex="E:\Users\Austen\AndroidStudioProjects\Stropping\app\build\intermediates\transforms\dex\debug\folders\1000\10\constraint-layout-solver-1.0.0-alpha1_c9877f634ba2f64a4626c55c97bf7155cc33163c\classes.dex" />
     </item>
     <item
         is-multidex="true"
