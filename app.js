@@ -24,6 +24,30 @@
   if (!TABS.includes(tab)) tab = 'week';
   let itemFilter = '';
 
+  // ---------- Sharing (sync.js) ----------
+  const SHARED_KEY = 'stropping:shared';
+  const JOIN_KEY = 'stropping:join';
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const cfg = window.STROPPING_FIREBASE_CONFIG;
+  let sync = null;
+  let syncStatus = { configured: !!(cfg && cfg.apiKey), ready: false };
+  let shadow = clone(state); // state as last saved/synced; commit() diffs against it
+  let queued = []; // changes made before sync connected, on a device that was sharing
+  let joinPrompted = false;
+  let pendingJoin = null;
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
+  const shared = () => !!(sync && syncStatus.householdId);
+  {
+    const params = new URLSearchParams(location.search);
+    const code = params.get('join');
+    if (code) {
+      lsSet(JOIN_KEY, code);
+      history.replaceState(null, '', location.pathname);
+    }
+    pendingJoin = lsGet(JOIN_KEY);
+  }
+
   function load() {
     let raw = null;
     try { raw = localStorage.getItem(KEY); } catch (e) {
@@ -45,11 +69,88 @@
     }
   }
 
-  function commit(next) {
-    if (next) state = next;
+  /**
+   * Save changes. Either mutate `state` in place and call commit(), or pass a
+   * new state. Flows that awaited the user pass the state they started from as
+   * `base`, so only their own changes are applied on top of anything that
+   * arrived from other devices in the meantime.
+   */
+  function commit(next, base) {
+    let changes;
+    if (next && base) {
+      changes = L.diffDocs(L.toDocs(base), L.toDocs(next));
+      state = L.applyDocChanges(state, changes);
+    } else {
+      if (next) state = next;
+      changes = L.diffDocs(L.toDocs(shadow), L.toDocs(state));
+    }
+    shadow = clone(state);
+    save();
+    render();
+    if (!changes.set.length && !changes.del.length) return;
+    if (shared()) sync.write(changes);
+    else if (lsGet(SHARED_KEY)) queued.push(changes);
+  }
+
+  // Called by sync.js with the household's documents whenever they change.
+  function onRemote(docs) {
+    let next = L.fromDocs(docs);
+    if (queued.length && shared()) {
+      for (const ch of queued) {
+        next = L.applyDocChanges(next, ch);
+        sync.write(ch);
+      }
+      queued = [];
+    }
+    state = next;
+    shadow = clone(state);
     save();
     render();
   }
+
+  function onSyncStatus(st) {
+    syncStatus = st;
+    if (st.householdId) lsSet(SHARED_KEY, '1');
+    else if (st.householdLoaded) { lsSet(SHARED_KEY, null); queued = []; }
+    updatePill();
+    const section = $('#sheet[open] #household');
+    if (section) section.innerHTML = householdHtml();
+    const note = $('#sheet[open] #storage-note');
+    if (note) note.textContent = storageNote();
+    // Opened from an invite link: once signed in, offer to join.
+    if (pendingJoin && st.ready) {
+      if (st.user && st.householdLoaded) {
+        const code = pendingJoin;
+        pendingJoin = null;
+        lsSet(JOIN_KEY, null);
+        joinFlow(code);
+      } else if (!st.user && !joinPrompted) {
+        joinPrompted = true;
+        if (!$('#sheet').open) menuSheet();
+        toast('Sign in to join the household you were invited to.');
+      }
+    }
+    if (st.error && st.error !== onSyncStatus.lastError) toast(st.error);
+    onSyncStatus.lastError = st.error;
+  }
+
+  function updatePill() {
+    const pill = $('#sync-pill');
+    if (!shared()) { pill.hidden = true; return; }
+    pill.hidden = false;
+    const offline = !navigator.onLine;
+    pill.textContent = offline ? 'Offline' : syncStatus.pending ? 'Saving…' : 'Shared';
+    pill.className = `pill${offline ? ' warn' : ''}`;
+    pill.title = offline ? 'Changes are saved on this phone and will sync when you’re back online.' : `Shared with ${syncStatus.household ? syncStatus.household.name : 'your household'}`;
+  }
+  window.addEventListener('online', updatePill);
+  window.addEventListener('offline', updatePill);
+
+  window.StroppingApp = {
+    attachSync(adapter) { sync = adapter; },
+    onRemote,
+    onSyncStatus,
+  };
 
   // ---------- Formatting ----------
 
@@ -316,7 +417,9 @@
         ${progress ? `<p class="progress">${esc(progress)}</p>` : ''}
         <h2>${esc(title)}</h2>
         ${text ? `<p>${esc(text)}</p>` : ''}${html}
-        ${input ? `<label class="field"><span>${esc(input.label)}</span><input name="v" type="number" min="0" step="any" inputmode="decimal" value="${esc(input.value)}"></label>` : ''}
+        ${input ? `<label class="field"><span>${esc(input.label)}</span>${input.type === 'text'
+          ? `<input name="v" type="text" autocomplete="off" autocapitalize="${input.caps || 'sentences'}" value="${esc(input.value)}">`
+          : `<input name="v" type="number" min="0" step="any" inputmode="decimal" value="${esc(input.value)}">`}</label>` : ''}
         <div class="prompt-actions${stack ? ' stack' : ''}">${buttons.map((b, i) => `<button type="button" class="btn ${b.style || ''}" data-i="${i}">${esc(b.label)}</button>`).join('')}</div>
       </form>`;
       const field = $('input[name=v]', d);
@@ -330,6 +433,15 @@
       const press = (b) => {
         if (b.value === null) return finish(null);
         if (!input) return finish(b.value);
+        if (input.type === 'text') {
+          const t = field.value.trim();
+          if (b.needsInput && !t) {
+            field.setCustomValidity('Please fill this in');
+            field.reportValidity();
+            return;
+          }
+          return finish({ value: b.value, input: t });
+        }
         const v = parseFloat(field.value);
         if (b.needsInput && !(v >= 0)) {
           field.setCustomValidity('Enter an amount');
@@ -433,9 +545,10 @@
   // ---------- Flows ----------
 
   async function planFlow(recipeId, portions) {
-    const res = await L.planMeal(state, recipeId, portions, flowAsk);
+    const base = state;
+    const res = await L.planMeal(base, recipeId, portions, flowAsk);
     if (!res) { toast('Cancelled. Nothing was changed.'); return; }
-    commit(res.state);
+    commit(res.state, base);
     const line = (r) => {
       const u = r.item.unit;
       if (r.status === 'have') return 'in the cupboard';
@@ -465,9 +578,10 @@
         : 'No meals were planned this week. Stropping will check the short-life items in your cupboard.',
       'Start');
     if (!ok) return;
-    const res = await L.startNewWeek(state, flowAsk);
+    const base = state;
+    const res = await L.startNewWeek(base, flowAsk);
     if (!res) { toast('Cancelled. Nothing was changed.'); return; }
-    commit(res.state);
+    commit(res.state, base);
     go('week');
     const s = res.summary;
     const lines = [
@@ -486,8 +600,9 @@
 
   async function sweepFlow() {
     if (!Object.keys(state.cupboard).length) { toast('The cupboard is empty.'); return; }
-    const res = await L.sweep(state, flowAsk);
-    commit(res.state);
+    const base = state;
+    const res = await L.sweep(base, flowAsk);
+    commit(res.state, base);
     toast(`Checked ${res.reviewed} of ${plural(res.total, 'item')}${res.removed ? `, ${res.removed} removed` : ''}.`);
   }
 
@@ -785,10 +900,132 @@
     });
   }
 
+  function householdHtml() {
+    const st = syncStatus;
+    if (!st.configured) {
+      return '<p class="hint">Sharing with your household isn’t set up yet. See “Sharing with your household” in the README.</p>';
+    }
+    if (!st.ready) return `<h3>Household</h3><p class="hint">${esc(st.error || 'Connecting…')}</p>`;
+    if (!st.user) {
+      return `<h3>${pendingJoin ? 'You’ve been invited to a household' : 'Share with your household'}</h3>
+        <p>${pendingJoin ? 'Sign in with Google to join it.' : 'Sign in to keep recipes, the cupboard and the shopping list in sync on everyone’s phone.'}</p>
+        <button type="button" class="btn primary" data-h="signin">Sign in with Google</button>`;
+    }
+    const who = `<p class="hint">Signed in as ${esc(st.user.name)} · <button type="button" class="link-btn" data-h="signout">Sign out</button></p>`;
+    if (!st.householdLoaded) return `<h3>Household</h3><p class="hint">Loading…</p>${who}`;
+    if (!st.householdId) {
+      return `<h3>Share with your household</h3>
+        <p>Create a household and invite others, or join one with an invite.</p>
+        <div class="row-btns"><button type="button" class="btn primary" data-h="create">Create a household</button><button type="button" class="btn" data-h="join">Join with a code</button></div>
+        ${who}`;
+    }
+    const h = st.household;
+    const members = h ? h.members.map((m) => `<li>${esc(m.name)}${m.uid === st.user.uid ? ' <span class="sub">(you)</span>' : ''}</li>`).join('') : '';
+    return `<h3>${esc(h ? h.name : 'Household')}</h3>
+      ${members ? `<ul class="members">${members}</ul>` : ''}
+      <div class="row-btns"><button type="button" class="btn primary" data-h="invite">Invite someone</button><button type="button" class="btn" data-h="leave">Leave</button></div>
+      ${who}`;
+  }
+
+  async function householdAction(action) {
+    try {
+      if (action === 'signin') await sync.signIn();
+      if (action === 'signout') {
+        if (shared() && !(await confirm('Sign out?', 'This device keeps a copy of the data but stops syncing with your household.', 'Sign out'))) return;
+        await sync.signOut();
+      }
+      if (action === 'create') {
+        const res = await ask({
+          title: 'Create a household',
+          text: 'Everything on this device (recipes, items, cupboard and shopping list) becomes the household’s. You can then invite others.',
+          input: { type: 'text', label: 'Household name', value: 'Our kitchen' },
+          buttons: [{ label: 'Cancel', value: null }, { label: 'Create', value: 'create', style: 'primary', needsInput: true }],
+        });
+        if (!res) return;
+        toast('Creating household…');
+        await sync.createHousehold(res.input, L.toDocs(state));
+        toast(`${res.input} created. Now invite someone.`);
+      }
+      if (action === 'join') {
+        const res = await ask({
+          title: 'Join a household',
+          text: 'Enter the code from your invite, or just open the invite link on this phone.',
+          input: { type: 'text', label: 'Invite code', value: '', caps: 'characters' },
+          buttons: [{ label: 'Cancel', value: null }, { label: 'Join', value: 'join', style: 'primary', needsInput: true }],
+        });
+        if (res) await joinFlow(res.input);
+      }
+      if (action === 'invite') await inviteFlow();
+      if (action === 'leave') {
+        if (!(await confirm('Leave this household?', 'This device keeps a copy of the data, but it will no longer sync. Others in the household keep everything.', 'Leave', 'danger'))) return;
+        await sync.leave();
+        toast('You’ve left the household.');
+      }
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Something went wrong.');
+    }
+  }
+
+  async function joinFlow(code) {
+    if (!sync || !syncStatus.user) { toast('Sign in first.'); return; }
+    const hasLocal = state.items.length || state.recipes.length;
+    if (syncStatus.householdId) {
+      if (!(await confirm('Switch household?', 'You’ll leave your current household and join the new one.', 'Switch'))) return;
+    } else if (hasLocal) {
+      const v = await ask({
+        title: 'Join this household?',
+        text: 'The household’s recipes, cupboard and shopping list will replace what’s on this device.',
+        buttons: [{ label: 'Cancel', value: null }, { label: 'Back up, then join', value: 'backup' }, { label: 'Join', value: 'join', style: 'primary' }],
+      });
+      if (!v) return;
+      if (v === 'backup') exportData();
+    }
+    try {
+      toast('Joining…');
+      await sync.join(code);
+      toast('You’ve joined the household.');
+      go('week');
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Couldn’t join.');
+    }
+  }
+
+  async function inviteFlow() {
+    const code = await sync.invite();
+    const link = `${location.origin}${location.pathname}?join=${code}`;
+    const canShare = !!navigator.share;
+    const v = await ask({
+      title: 'Invite someone',
+      html: `<p>Send them this link. They open it on their phone and sign in with Google. It works for 7 days.</p>
+        <p class="invite-link">${esc(link)}</p>
+        <p class="hint">Or they can enter the code <strong class="code">${esc(code)}</strong> under ⋮ → Join with a code.</p>`,
+      buttons: [{ label: 'Close', value: null }, { label: 'Copy link', value: 'copy', style: canShare ? '' : 'primary' },
+        ...(canShare ? [{ label: 'Share…', value: 'share', style: 'primary' }] : [])],
+    });
+    if (v === 'share') {
+      navigator.share({ title: 'Join our Stropping household', text: 'Join my household on Stropping so we share recipes and the shopping list:', url: link }).catch(() => {});
+    } else if (v === 'copy') {
+      try {
+        await navigator.clipboard.writeText(link);
+        toast('Invite link copied.');
+      } catch (e) {
+        toast(`Couldn’t copy. The code is ${code}.`);
+      }
+    }
+  }
+
+  const storageNote = () => (shared()
+    ? 'Your data is shared with your household and also kept on this device for offline use.'
+    : 'Your data is stored in this browser, on this device only. Back it up now and then.');
+  const everyone = () => (shared() ? ' This also affects everyone in your household.' : '');
+
   function menuSheet() {
     openSheet({
       title: 'Stropping',
       html: `
+        <section id="household" class="household">${householdHtml()}</section>
         <div class="menu">
           <button type="button" data-m="export"><strong>Back up data</strong><small>Download a file you can restore later or on another device.</small></button>
           <button type="button" data-m="import"><strong>Restore from backup</strong><small>Replace everything here with a backup file.</small></button>
@@ -802,8 +1039,12 @@
           <p><strong>Start a new week</strong> to confirm what you cooked. Ingredients for uncooked meals go back in the cupboard, and short-life items get an in-date check.</p>
           <p><strong>Sweep</strong> the cupboard now and then to bring it back in line with reality.</p>
         </details>
-        <p class="hint">Your data is stored in this browser, on this device only. Back it up now and then.</p>`,
+        <p class="hint" id="storage-note">${storageNote()}</p>`,
       onMount: (d) => {
+        $('#household', d).addEventListener('click', (e) => {
+          const b = e.target.closest('[data-h]');
+          if (b) householdAction(b.dataset.h);
+        });
         const file = $('input[type=file]', d);
         d.querySelector('.menu').addEventListener('click', async (e) => {
           const b = e.target.closest('[data-m]');
@@ -813,7 +1054,7 @@
           if (m === 'import') file.click();
           if (m === 'sample') { closeSheet(); loadSample(); }
           if (m === 'erase') {
-            if (!(await confirm('Erase all data?', 'Recipes, items, cupboard and shopping list will all be deleted. This can’t be undone.', 'Erase', 'danger'))) return;
+            if (!(await confirm('Erase all data?', `Recipes, items, cupboard and shopping list will all be deleted. This can’t be undone.${everyone()}`, 'Erase', 'danger'))) return;
             closeSheet();
             commit(L.emptyState());
             go('week');
@@ -824,7 +1065,7 @@
           if (!f) return;
           try {
             const next = L.normalise(JSON.parse(await f.text()));
-            if (!(await confirm('Restore this backup?', `It has ${plural(next.recipes.length, 'recipe')} and ${plural(next.items.length, 'item')}. Everything currently here will be replaced.`, 'Restore'))) return;
+            if (!(await confirm('Restore this backup?', `It has ${plural(next.recipes.length, 'recipe')} and ${plural(next.items.length, 'item')}. Everything currently here will be replaced.${everyone()}`, 'Restore'))) return;
             closeSheet();
             commit(next);
             go('week');
@@ -851,7 +1092,7 @@
 
   async function loadSample() {
     const hasData = state.items.length || state.recipes.length;
-    if (hasData && !(await confirm('Replace your data?', 'Loading sample data replaces everything currently here.', 'Replace', 'danger'))) return;
+    if (hasData && !(await confirm('Replace your data?', `Loading sample data replaces everything currently here.${everyone()}`, 'Replace', 'danger'))) return;
     commit(L.sampleState());
     go('week');
     toast('Sample data loaded. Try adding a meal.');
@@ -914,12 +1155,15 @@
           ...(item.multiUse || e.done ? [] : [{ label: 'Save', value: 'save', style: 'primary', needsInput: true }])],
       });
       if (!res) return;
+      // Look the entry up again: another device may have changed the list while the dialog was open.
+      const cur = state.shopping.find((x) => x.id === id);
+      if (!cur) return;
       const action = typeof res === 'string' ? res : res.value;
-      if (action === 'remove') state.shopping = state.shopping.filter((x) => x !== e);
+      if (action === 'remove') state.shopping = state.shopping.filter((x) => x !== cur);
       else {
-        e.qty = L.round(res.input);
-        e.reserved = Math.min(e.reserved, e.qty);
-        if (e.qty <= L.EPS) state.shopping = state.shopping.filter((x) => x !== e);
+        cur.qty = L.round(res.input);
+        cur.reserved = Math.min(cur.reserved, cur.qty);
+        if (cur.qty <= L.EPS) state.shopping = state.shopping.filter((x) => x !== cur);
       }
       commit();
     },

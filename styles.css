@@ -293,6 +293,25 @@ legend { font-size: .85rem; font-weight: 650; color: var(--muted); padding: 0; m
 .ok { color: var(--ok); }
 .need { color: var(--need); }
 
+.pill {
+  display: inline-block; vertical-align: 3px; margin-left: 6px; padding: 2px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-size: .7rem; font-weight: 650; letter-spacing: 0;
+}
+.pill.warn { background: var(--short-bg); color: var(--short); }
+.household {
+  display: grid; gap: 10px; justify-items: start;
+  padding: 16px; border-radius: 14px; background: var(--surface-2);
+}
+.household h3 { font-size: 1.05rem; }
+.household p { color: var(--muted); font-size: .92rem; }
+.household .hint { margin-top: 0; }
+.members { margin: 0; padding-left: 18px; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.invite-link {
+  padding: 10px 12px; border-radius: 10px; background: var(--surface-2); color: var(--text) !important;
+  font-family: ui-monospace, Consolas, monospace; font-size: .82rem; word-break: break-all;
+}
+.code { font-family: ui-monospace, Consolas, monospace; letter-spacing: .08em; color: var(--text); }
 .menu { display: grid; gap: 8px; }
 .menu button {
   display: grid; gap: 2px; padding: 12px 14px; text-align: left;

@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Stropping security rules. Paste into Firebase console → Firestore Database → Rules.
+// Only members of a household can see or change its data. Anyone signed in can
+// join a household, but only with an unexpired invite code created by a member.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(hid) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.members;
+    }
+
+    function validInvite(code, hid) {
+      let path = /databases/$(database)/documents/invites/$(code);
+      return exists(path)
+        && get(path).data.householdId == hid
+        && get(path).data.expiresAt > request.time;
+    }
+
+    // Which household each user belongs to.
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /households/{hid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+
+      // You can only create a household with yourself as the sole member.
+      allow create: if signedIn() && request.resource.data.members == [request.auth.uid];
+
+      // Members can change anything, including leaving.
+      allow update: if signedIn() && request.auth.uid in resource.data.members;
+
+      // Joining: add only yourself, keep everyone else, and present a valid invite.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberInfo', 'joinCode'])
+        && request.resource.data.members.removeAll(resource.data.members).hasOnly([request.auth.uid])
+        && resource.data.members.removeAll(request.resource.data.members).size() == 0
+        && validInvite(request.resource.data.joinCode, hid);
+
+      // Recipes, items, cupboard, shopping list, meals, week info.
+      match /{collection}/{docId} {
+        allow read, write: if isMember(hid);
+      }
+    }
+
+    // Invite codes are long and random; you must know one to read it.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && isMember(request.resource.data.householdId);
+      allow delete: if signedIn() && isMember(resource.data.householdId);
+    }
+  }
+}

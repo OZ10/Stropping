@@ -14,7 +14,7 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 id="title">Stropping</h1>
+    <h1 id="title">Stropping <span id="sync-pill" class="pill" hidden></span></h1>
     <button class="icon-btn" data-act="menu" aria-label="Menu">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
     </button>
@@ -34,7 +34,9 @@
   <dialog id="prompt" class="prompt"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <script src="firebase-config.js"></script>
   <script src="logic.js"></script>
   <script src="app.js"></script>
+  <script type="module" src="sync.js"></script>
 </body>
 </html>

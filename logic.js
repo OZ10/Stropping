@@ -81,7 +81,7 @@
         start: raw.week.start || today(),
         meals: raw.week.meals.map((m) => ({
           id: m.id || uid(), recipeId: m.recipeId, name: String(m.name || 'Meal'), url: m.url || '',
-          portions: Number(m.portions) || 1, cooked: !!m.cooked,
+          portions: Number(m.portions) || 1, cooked: !!m.cooked, at: Number(m.at) || 0,
           alloc: (Array.isArray(m.alloc) ? m.alloc : []).map((a) => ({
             itemId: a.itemId, need: round(a.need), fromCupboard: round(a.fromCupboard), toShop: round(a.toShop),
           })),
@@ -213,7 +213,7 @@
     if (!recipe) throw new Error('Recipe not found');
     const meal = {
       id: uid(), recipeId, name: recipe.name, url: recipe.url || '', portions: Number(portions) || recipe.serves,
-      cooked: false, alloc: [],
+      cooked: false, at: Date.now(), alloc: [],
     };
     const report = [];
     const answered = new Map();
@@ -437,12 +437,106 @@
     return s;
   }
 
+  // ---------- Sync documents ----------
+  //
+  // For sharing, state is stored as one small document per entity so that two
+  // people editing different things never overwrite each other. Paths:
+  //   items/{id}  recipes/{id}  shopping/{id}  cupboard/{itemId}  meals/{id}  meta/week
+
+  const SYNC_COLLECTIONS = ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
+
+  /** JSON with sorted keys, so documents compare equal regardless of key order. */
+  function stableJson(v) {
+    if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+    if (v && typeof v === 'object') {
+      return `{${Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(',')}}`;
+    }
+    return JSON.stringify(v === undefined ? null : v);
+  }
+
+  function toDocs(s) {
+    const d = new Map();
+    for (const i of s.items) d.set(`items/${i.id}`, clone(i));
+    for (const r of s.recipes) d.set(`recipes/${r.id}`, clone(r));
+    for (const e of s.shopping) d.set(`shopping/${e.id}`, clone(e));
+    for (const [id, qty] of Object.entries(s.cupboard)) d.set(`cupboard/${id}`, { qty });
+    s.week.meals.forEach((m, n) => d.set(`meals/${m.id}`, { ...clone(m), at: m.at || n }));
+    d.set('meta/week', { id: s.week.id, start: s.week.start, lastWeek: s.lastWeek ? clone(s.lastWeek) : null });
+    return d;
+  }
+
+  /**
+   * Rebuild state from documents. Deliberately lenient: unlike normalise() it
+   * keeps references to items it hasn't seen yet, because during sync a recipe
+   * can arrive a moment before the item it uses.
+   */
+  function fromDocs(d) {
+    const s = emptyState();
+    let meta = null;
+    for (const [path, data] of d) {
+      const [coll, id] = path.split('/');
+      if (!data || !id) continue;
+      if (coll === 'items') {
+        s.items.push({
+          id, name: String(data.name || ''), unit: UNITS.includes(data.unit) ? data.unit : 'each',
+          category: CATEGORIES.includes(data.category) ? data.category : 'Other',
+          frequent: !!data.frequent, shortLife: !!data.shortLife, multiUse: !!data.multiUse,
+        });
+      } else if (coll === 'recipes') {
+        s.recipes.push({
+          id, name: String(data.name || ''), url: data.url || '', serves: Number(data.serves) > 0 ? Number(data.serves) : 1,
+          ingredients: (Array.isArray(data.ingredients) ? data.ingredients : []).map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
+        });
+      } else if (coll === 'shopping') {
+        s.shopping.push({ id, itemId: data.itemId, qty: round(data.qty), reserved: round(data.reserved), done: !!data.done, added: round(data.added) });
+      } else if (coll === 'cupboard') {
+        if (Number(data.qty) > EPS) s.cupboard[id] = round(data.qty);
+      } else if (coll === 'meals') {
+        s.week.meals.push({
+          id, recipeId: data.recipeId, name: String(data.name || 'Meal'), url: data.url || '',
+          portions: Number(data.portions) || 1, cooked: !!data.cooked, at: Number(data.at) || 0,
+          alloc: (Array.isArray(data.alloc) ? data.alloc : []).map((a) => ({
+            itemId: a.itemId, need: round(a.need), fromCupboard: round(a.fromCupboard), toShop: round(a.toShop),
+          })),
+        });
+      } else if (coll === 'meta' && id === 'week') {
+        meta = data;
+      }
+    }
+    s.week.meals.sort((a, b) => a.at - b.at);
+    if (meta) {
+      s.week.id = meta.id || s.week.id;
+      s.week.start = meta.start || s.week.start;
+      s.lastWeek = meta.lastWeek || null;
+    }
+    return s;
+  }
+
+  /** Documents to write and delete to get from `before` to `after` (both Maps from toDocs). */
+  function diffDocs(before, after) {
+    const set = [];
+    const del = [];
+    for (const [k, v] of after) {
+      if (!before.has(k) || stableJson(before.get(k)) !== stableJson(v)) set.push([k, v]);
+    }
+    for (const k of before.keys()) if (!after.has(k)) del.push(k);
+    return { set, del };
+  }
+
+  function applyDocChanges(s, changes) {
+    const d = toDocs(s);
+    for (const [k, v] of changes.set) d.set(k, v);
+    for (const k of changes.del) d.delete(k);
+    return fromDocs(d);
+  }
+
   const api = {
     UNITS, CATEGORIES, EPS, uid, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, unreserve,
     scaleQty, planMeal, removeMeal, setCooked, startNewWeek, sweep, heldFor,
+    SYNC_COLLECTIONS, toDocs, fromDocs, diffDocs, applyDocChanges,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
