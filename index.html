@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Stropping</title>
+  <meta name="description" content="Recipes, store cupboard and shopping list in one place.">
+  <meta name="theme-color" content="#2f6b4f" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141815" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="title">Stropping</h1>
+    <button class="icon-btn" data-act="menu" aria-label="Menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+    </button>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <nav class="tabbar" aria-label="Sections">
+    <button data-tab="week"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zM5 9h14v10H5z"/></svg><span>Week</span></button>
+    <button data-tab="recipes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm2 4v2h8V7zm0 4v2h8v-2zm0 4v2h5v-2z"/></svg><span>Recipes</span></button>
+    <button data-tab="cupboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16a1 1 0 0 1 1 1v17h-2v-1H5v1H3V4a1 1 0 0 1 1-1zm1 2v6h6V5zm8 0v6h6V5zM5 13v5h6v-5zm8 0v5h6v-5zM9 7.5h1v2H9zm5 0h1v2h-1z"/></svg><span>Cupboard</span></button>
+    <button data-tab="shopping"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM1 2h3.3l.9 2H21a1 1 0 0 1 .9 1.4l-3.6 6.5A2 2 0 0 1 16.6 13H8.1l-1.1 2H19v2H5.5a1 1 0 0 1-.9-1.5L6.2 12.6 2.6 4H1z"/></svg><span>Shopping</span><b class="count" id="shop-count" hidden></b></button>
+    <button data-tab="items"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zm-4 6h2v2H3zm4 0h14v2H7z"/></svg><span>Items</span></button>
+  </nav>
+
+  <dialog id="sheet" class="sheet"></dialog>
+  <dialog id="prompt" class="prompt"></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="logic.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

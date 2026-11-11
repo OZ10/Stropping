@@ -1,0 +1,983 @@
+/* Stropping — UI. Rules live in logic.js; this file renders views and runs the prompts. */
+(function () {
+  'use strict';
+
+  const L = window.StroppingLogic;
+  const KEY = 'stropping:v1';
+  const TAB_KEY = 'stropping:tab';
+  const TABS = ['week', 'recipes', 'cupboard', 'shopping', 'items'];
+
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const $$ = (sel, el = document) => Array.from(el.querySelectorAll(sel));
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const ICON = {
+    x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
+  };
+
+  // ---------- Storage ----------
+
+  let state = load();
+  let tab = 'week';
+  try { tab = localStorage.getItem(TAB_KEY) || 'week'; } catch (e) { /* storage blocked */ }
+  if (!TABS.includes(tab)) tab = 'week';
+  let itemFilter = '';
+
+  function load() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) {
+      setTimeout(() => toast('This browser is blocking storage, so changes won’t be kept.'), 300);
+    }
+    if (!raw) return L.emptyState();
+    try {
+      return L.normalise(JSON.parse(raw));
+    } catch (e) {
+      try { localStorage.setItem(`${KEY}:unreadable-${Date.now()}`, raw); } catch (_) { /* ignore */ }
+      setTimeout(() => toast('Saved data couldn’t be read. A copy was kept and the app started empty.'), 300);
+      return L.emptyState();
+    }
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {
+      toast('Couldn’t save. Browser storage may be full or blocked.');
+    }
+  }
+
+  function commit(next) {
+    if (next) state = next;
+    save();
+    render();
+  }
+
+  // ---------- Formatting ----------
+
+  const PLURAL = { clove: 'cloves', tin: 'tins', jar: 'jars', pack: 'packs', bottle: 'bottles', bunch: 'bunches', slice: 'slices', pinch: 'pinches' };
+  const num = (n) => String(L.round(n));
+  function fmtQty(n, unit) {
+    const v = num(n);
+    if (unit === 'each') return v;
+    if (PLURAL[unit]) return `${v} ${L.round(n) === 1 ? unit : PLURAL[unit]}`;
+    return `${v} ${unit}`;
+  }
+  const itemQty = (item, n) => (item.multiUse ? 'In stock' : fmtQty(n, item.unit));
+  const fmtDate = (iso) => new Date(`${iso}T00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  function safeUrl(u) {
+    try {
+      const x = new URL(u);
+      return /^https?:$/.test(x.protocol) ? x.href : '';
+    } catch (e) { return ''; }
+  }
+  function host(u) {
+    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
+  }
+
+  function badges(item) {
+    return [
+      item.frequent && '<span class="badge freq">Frequent</span>',
+      item.shortLife && '<span class="badge short">Short life</span>',
+      item.multiUse && '<span class="badge multi">Multi-use</span>',
+    ].filter(Boolean).join('');
+  }
+
+  /** Group [{item,...}] rows by item category in the standard order. */
+  function byCategory(rows) {
+    const groups = new Map();
+    for (const row of rows) {
+      const cat = row.item.category;
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat).push(row);
+    }
+    return L.CATEGORIES.filter((c) => groups.has(c)).map((c) => [c, groups.get(c).sort((a, b) => a.item.name.localeCompare(b.item.name))]);
+  }
+
+  const unitOptions = (sel) => L.UNITS.map((u) => `<option value="${u}"${u === sel ? ' selected' : ''}>${u}</option>`).join('');
+  const catOptions = (sel) => L.CATEGORIES.map((c) => `<option${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const itemsDatalist = () => `<datalist id="items-dl">${state.items.map((i) => `<option value="${esc(i.name)}">`).join('')}</datalist>`;
+
+  function empty(text, extra = '') {
+    return `<div class="empty"><p>${esc(text)}</p>${extra}</div>`;
+  }
+
+  // ---------- Views ----------
+
+  const VIEWS = { week: renderWeek, recipes: renderRecipes, cupboard: renderCupboard, shopping: renderShopping, items: renderItems };
+
+  function render() {
+    $('#view').innerHTML = VIEWS[tab]();
+    $$('.tabbar [data-tab]').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'));
+    const n = state.shopping.filter((e) => !e.done).length;
+    const c = $('#shop-count');
+    c.hidden = !n;
+    c.textContent = n;
+    if (tab === 'items') applyItemFilter();
+  }
+
+  function go(t) {
+    tab = t;
+    try { localStorage.setItem(TAB_KEY, t); } catch (e) { /* ignore */ }
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function renderWeek() {
+    const meals = state.week.meals;
+    const toBuy = state.shopping.filter((e) => !e.done).length;
+    const fresh = !state.items.length && !state.recipes.length;
+    let body;
+    if (meals.length) {
+      body = `<ul class="cards">${meals.map(mealCard).join('')}</ul>`;
+    } else if (fresh) {
+      body = empty('Welcome! Add your recipes, then plan them into the week. Stropping checks the cupboard and builds your shopping list.',
+        '<div class="row-btns"><button class="btn primary" data-act="new-recipe">+ Add a recipe</button><button class="btn" data-act="sample">Try sample data</button></div>');
+    } else if (!state.recipes.length) {
+      body = empty('No recipes yet. Add one, then plan it into the week.', '<button class="btn primary" data-act="new-recipe">+ Add a recipe</button>');
+    } else {
+      body = empty('Nothing planned yet. Add a meal and Stropping will work out what you need to buy.');
+    }
+    const lw = state.lastWeek;
+    const lastWeek = lw ? `<p class="hint">Last week: ${[
+      lw.cooked.length && `${lw.cooked.length} cooked`,
+      lw.carried.length && `${lw.carried.length} carried over`,
+      lw.dropped.length && `${lw.dropped.length} dropped`,
+      lw.binned.length && `${lw.binned.length} short-life item${lw.binned.length === 1 ? '' : 's'} thrown out`,
+    ].filter(Boolean).join(', ') || 'no meals planned'}.</p>` : '';
+
+    return `
+      <div class="head">
+        <div><h2>This week</h2><p class="sub">Started ${esc(fmtDate(state.week.start))}</p></div>
+        ${state.recipes.length ? '<button class="btn primary" data-act="add-meal">+ Add meal</button>' : ''}
+      </div>
+      ${body}
+      ${toBuy ? `<button class="banner" data-act="go" data-tab="shopping"><span><strong>${toBuy}</strong> ${toBuy === 1 ? 'item' : 'items'} on the shopping list</span><span aria-hidden="true">→</span></button>` : ''}
+      ${fresh ? '' : `<section class="panel">
+        <h3>Ready for next week’s shop?</h3>
+        <p>Confirm which meals you cooked. Ingredients for uncooked meals go back in the cupboard, and short-life items get an in-date check.</p>
+        <button class="btn" data-act="new-week">Start a new week</button>
+        ${lastWeek}
+      </section>`}`;
+  }
+
+  function mealCard(m) {
+    const url = safeUrl(m.url);
+    return `<li class="card meal${m.cooked ? ' is-done' : ''}">
+      <label class="check" title="Cooked"><input type="checkbox" data-act="cooked" data-id="${m.id}"${m.cooked ? ' checked' : ''}><span class="sr">Mark ${esc(m.name)} cooked</span></label>
+      <div class="grow">
+        <div class="title">${esc(m.name)}</div>
+        <div class="sub">${plural(m.portions, 'portion')}${m.cooked ? ' · cooked' : ''}</div>
+      </div>
+      ${url ? `<a class="icon-btn" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Open recipe for ${esc(m.name)}">${ICON.link}</a>` : ''}
+      <button class="icon-btn" data-act="remove-meal" data-id="${m.id}" aria-label="Remove ${esc(m.name)}">${ICON.x}</button>
+    </li>`;
+  }
+
+  function renderRecipes() {
+    const planned = new Set(state.week.meals.map((m) => m.recipeId));
+    const list = [...state.recipes].sort((a, b) => a.name.localeCompare(b.name));
+    return `
+      <div class="head">
+        <div><h2>Recipes</h2><p class="sub">${plural(list.length, 'recipe')}</p></div>
+        <button class="btn primary" data-act="new-recipe">+ New recipe</button>
+      </div>
+      ${list.length ? `<ul class="cards">${list.map((r) => `
+        <li><button class="card recipe" data-act="view-recipe" data-id="${r.id}">
+          <span class="grow">
+            <span class="title">${esc(r.name)}</span>
+            <span class="sub">Serves ${r.serves} · ${plural(r.ingredients.length, 'ingredient')}${host(r.url) ? ` · ${esc(host(r.url))}` : ''}</span>
+          </span>
+          ${planned.has(r.id) ? '<span class="badge plan">This week</span>' : ''}
+        </button></li>`).join('')}</ul>`
+        : empty('No recipes yet. Add a name, a link and the ingredients for the number of portions it makes.')}`;
+  }
+
+  function renderCupboard() {
+    const rows = Object.entries(state.cupboard).map(([id, qty]) => ({ item: L.itemById(state, id), qty })).filter((r) => r.item);
+    return `
+      <div class="head">
+        <div><h2>Store cupboard</h2><p class="sub">${plural(rows.length, 'item')} in stock</p></div>
+        <div class="row-btns">
+          ${rows.length ? '<button class="btn" data-act="sweep">Sweep</button>' : ''}
+          <button class="btn primary" data-act="add-cupboard">+ Add</button>
+        </div>
+      </div>
+      ${rows.length ? byCategory(rows).map(([cat, list]) => `
+        <section class="group"><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ item, qty }) => `
+          <li><button class="row-main" data-act="edit-cupboard" data-id="${item.id}">
+            <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span>
+            <span class="qty">${esc(itemQty(item, qty))}</span>
+          </button></li>`).join('')}</ul></section>`).join('')
+        : empty('The cupboard is empty. Add what you have in stock, or tick things off the shopping list and they’ll be added here.')}
+      ${rows.length ? '<p class="hint">Sweep goes through each item so you can confirm it’s still there.</p>' : ''}`;
+  }
+
+  function renderShopping() {
+    const rows = state.shopping.map((e) => ({ e, item: L.itemById(state, e.itemId) })).filter((r) => r.item);
+    const toBuy = rows.filter((r) => !r.e.done).length;
+    const ticked = rows.length - toBuy;
+    return `
+      <div class="head">
+        <div><h2>Shopping list</h2><p class="sub">${toBuy ? `${toBuy} to buy` : 'All done'}</p></div>
+        <button class="btn primary" data-act="add-shopping">+ Add</button>
+      </div>
+      ${rows.length ? byCategory(rows).map(([cat, list]) => `
+        <section class="group"><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ e, item }) => `
+          <li class="shop${e.done ? ' is-done' : ''}">
+            <label class="check"><input type="checkbox" data-act="bought" data-id="${e.id}"${e.done ? ' checked' : ''}><span class="sr">Bought ${esc(item.name)}</span></label>
+            <button class="row-main" data-act="edit-shopping" data-id="${e.id}">
+              <span class="grow"><span class="title">${esc(item.name)}</span>${e.reserved > L.EPS ? '<span class="sub">for this week’s meals</span>' : ''}</span>
+              <span class="qty">${item.multiUse ? '' : esc(fmtQty(L.buyQty(state, e), item.unit))}</span>
+            </button>
+          </li>`).join('')}</ul></section>`).join('')
+        : empty('Nothing on the list. Plan some meals, or add items yourself.')}
+      ${ticked ? `<div class="foot"><button class="btn" data-act="clear-bought">Clear ${plural(ticked, 'ticked item')}</button></div>` : ''}
+      ${rows.length ? '<p class="hint">Ticking an item puts it in the cupboard, apart from the amount set aside for this week’s meals.</p>' : ''}`;
+  }
+
+  function renderItems() {
+    const rows = state.items.map((item) => ({ item }));
+    const onList = new Set(state.shopping.filter((e) => !e.done).map((e) => e.itemId));
+    return `
+      <div class="head">
+        <div><h2>Items</h2><p class="sub">Ingredients and household items</p></div>
+        <button class="btn primary" data-act="new-item">+ New item</button>
+      </div>
+      ${rows.length ? `<input type="search" class="search" data-filter placeholder="Search items" aria-label="Search items" value="${esc(itemFilter)}">` : ''}
+      ${rows.length ? byCategory(rows).map(([cat, list]) => `
+        <section class="group" data-group><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ item }) => `
+          <li data-name="${esc(item.name.toLowerCase())}">
+            <button class="row-main" data-act="edit-item" data-id="${item.id}">
+              <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span>
+              <span class="sub">${esc(item.unit)}</span>
+            </button>
+            ${onList.has(item.id) ? '<span class="on-list">On list</span>' : `<button class="btn small" data-act="item-to-list" data-id="${item.id}" aria-label="Add ${esc(item.name)} to shopping list">+ List</button>`}
+          </li>`).join('')}</ul></section>`).join('')
+        : empty('No items yet. Items are created automatically when you add ingredients to a recipe, or you can add them here.')}
+      <p class="hint empty-search" hidden>No items match.</p>`;
+  }
+
+  function applyItemFilter() {
+    const q = itemFilter.trim().toLowerCase();
+    let any = false;
+    $$('[data-group]').forEach((g) => {
+      let shown = 0;
+      $$('li[data-name]', g).forEach((li) => {
+        const ok = !q || li.dataset.name.includes(q);
+        li.hidden = !ok;
+        if (ok) shown++;
+      });
+      g.hidden = !shown;
+      if (shown) any = true;
+    });
+    const msg = $('.empty-search');
+    if (msg) msg.hidden = any || !state.items.length;
+  }
+
+  // ---------- Dialogs ----------
+
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  /** Open the form sheet. onSubmit(form) runs on submit; return false to keep it open. */
+  function openSheet({ title, html, onMount, onSubmit }) {
+    const d = $('#sheet');
+    d.innerHTML = `<form class="sheet-inner">
+      <header class="sheet-head"><h2 tabindex="-1" autofocus>${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="Close">${ICON.x}</button></header>
+      <div class="sheet-body">${html}</div>
+    </form>`;
+    const form = $('form', d);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (onSubmit && onSubmit(form) !== false) d.close();
+    });
+    if (!d.open) d.showModal();
+    if (onMount) onMount(d, form);
+    const first = $('input:not([type=hidden]):not([type=checkbox]), select', d);
+    if (first && !first.value) first.focus();
+  }
+  const closeSheet = () => $('#sheet').close();
+
+  /**
+   * Ask a question in a modal. buttons: [{label, value, style}].
+   * With `input`, resolves { value, input } (input is the number entered).
+   * A button whose value is null, or pressing Escape, resolves null.
+   */
+  function ask({ title, text = '', html = '', buttons, input, progress, stack }) {
+    return new Promise((resolve) => {
+      const d = $('#prompt');
+      d.innerHTML = `<form class="prompt-inner">
+        ${progress ? `<p class="progress">${esc(progress)}</p>` : ''}
+        <h2>${esc(title)}</h2>
+        ${text ? `<p>${esc(text)}</p>` : ''}${html}
+        ${input ? `<label class="field"><span>${esc(input.label)}</span><input name="v" type="number" min="0" step="any" inputmode="decimal" value="${esc(input.value)}"></label>` : ''}
+        <div class="prompt-actions${stack ? ' stack' : ''}">${buttons.map((b, i) => `<button type="button" class="btn ${b.style || ''}" data-i="${i}">${esc(b.label)}</button>`).join('')}</div>
+      </form>`;
+      const field = $('input[name=v]', d);
+      let settled = false;
+      const finish = (v) => {
+        if (settled) return;
+        settled = true;
+        d.close();
+        resolve(v);
+      };
+      const press = (b) => {
+        if (b.value === null) return finish(null);
+        if (!input) return finish(b.value);
+        const v = parseFloat(field.value);
+        if (b.needsInput && !(v >= 0)) {
+          field.setCustomValidity('Enter an amount');
+          field.reportValidity();
+          return;
+        }
+        finish({ value: b.value, input: v >= 0 ? v : null });
+      };
+      d.onclick = (e) => {
+        const b = e.target.closest('[data-i]');
+        if (b) press(buttons[+b.dataset.i]);
+      };
+      d.oncancel = (e) => { e.preventDefault(); finish(null); };
+      $('form', d).onsubmit = (e) => {
+        e.preventDefault();
+        const primary = buttons.find((b) => (b.style || '').includes('primary'));
+        if (primary) press(primary);
+      };
+      if (field) field.oninput = () => field.setCustomValidity('');
+      d.showModal();
+      if (field) { field.focus(); field.select(); } else {
+        const p = $('.btn.primary', d);
+        if (p) p.focus();
+      }
+    });
+  }
+
+  const confirm = (title, text, label = 'OK', style = 'primary') =>
+    ask({ title, text, buttons: [{ label: 'Cancel', value: false }, { label, value: true, style }] });
+
+  const CANCEL = { label: 'Cancel', value: null, style: 'quiet' };
+
+  // Questions asked by the flows in logic.js.
+  async function flowAsk(q) {
+    const item = q.item;
+    switch (q.kind) {
+      case 'multi':
+        return ask({
+          progress: `Planning ${q.meal.name}`,
+          title: `Have you got ${item.name}?`,
+          text: `${item.name} is multi-use, so Stropping can’t tell how much is left. Is there enough for this meal?`,
+          buttons: [CANCEL, { label: 'No, add to list', value: false }, { label: 'Yes', value: true, style: 'primary' }],
+        });
+      case 'frequent':
+        return ask({
+          progress: `Planning ${q.meal.name}`,
+          title: `Still got ${item.name}?`,
+          text: `The cupboard says ${fmtQty(q.qty, item.unit)}, but ${item.name} gets used outside recipes and may have run out. This meal needs ${fmtQty(q.need, item.unit)}.`,
+          buttons: [CANCEL, { label: 'No, add to list', value: false }, { label: 'Yes', value: true, style: 'primary' }],
+        });
+      case 'cooked':
+        return ask({
+          progress: `Last week · meal ${q.index + 1} of ${q.total}`,
+          title: `Did you cook ${q.meal.name}?`,
+          text: `${plural(q.meal.portions, 'portion')}. If you drop it, its ingredients go back in the cupboard.`,
+          stack: true,
+          buttons: [
+            { label: 'Yes, cooked', value: 'cooked', style: 'primary' },
+            { label: 'Not cooked, keep it for this week', value: 'carry' },
+            { label: 'Not cooked, drop it', value: 'drop' },
+            CANCEL,
+          ],
+        });
+      case 'shortlife-meal':
+        return ask({
+          progress: 'In-date check',
+          title: `Is the ${item.name} still in date?`,
+          text: `${q.meal.name} wasn’t cooked last week. ${fmtQty(q.qty, item.unit)} of ${item.name} is set aside for it.`,
+          buttons: [CANCEL, { label: 'No, buy fresh', value: false }, { label: 'Yes', value: true, style: 'primary' }],
+        });
+      case 'shortlife':
+        return ask({
+          progress: 'In-date check',
+          title: `Is the ${item.name} still in date?`,
+          text: `${item.name} (${fmtQty(q.qty, item.unit)}) is short-life and wasn’t used last week.`,
+          buttons: [CANCEL, { label: 'No, throw it out', value: false }, { label: 'Yes, keep it', value: true, style: 'primary' }],
+        });
+      case 'sweep': {
+        const res = await ask({
+          progress: `Sweep · ${q.index + 1} of ${q.total}`,
+          title: item.name,
+          text: item.multiUse ? 'Still in stock?' : 'Still in the cupboard? Change the amount if it’s different.',
+          input: item.multiUse ? null : { label: `Amount (${item.unit})`, value: num(q.qty) },
+          buttons: [
+            { label: 'Stop', value: null, style: 'quiet' },
+            { label: 'Gone', value: 'gone' },
+            { label: 'Gone, add to list', value: 'gone-list' },
+            { label: 'Still there', value: 'keep', style: 'primary' },
+          ],
+        });
+        if (res == null) return null;
+        const value = item.multiUse ? res : res.value;
+        if (value === 'keep') return { action: 'keep', qty: item.multiUse ? undefined : res.input };
+        return { action: 'gone', addToList: value === 'gone-list' };
+      }
+      default:
+        throw new Error(`Unknown question ${q.kind}`);
+    }
+  }
+
+  // ---------- Flows ----------
+
+  async function planFlow(recipeId, portions) {
+    const res = await L.planMeal(state, recipeId, portions, flowAsk);
+    if (!res) { toast('Cancelled. Nothing was changed.'); return; }
+    commit(res.state);
+    const line = (r) => {
+      const u = r.item.unit;
+      if (r.status === 'have') return 'in the cupboard';
+      if (r.status === 'on-list') return 'already on the list';
+      if (r.item.multiUse) return 'added to the list';
+      if (r.status === 'buy') return r.fromCupboard > L.EPS ? `${fmtQty(r.toShop, u)} to buy, ${fmtQty(r.fromCupboard, u)} from the cupboard` : `${fmtQty(r.toShop, u)} to buy`;
+      return `${fmtQty(r.fromCupboard, u)} from the cupboard`;
+    };
+    const buy = res.report.filter((r) => r.status === 'buy');
+    const have = res.report.filter((r) => r.status !== 'buy');
+    const list = (rows) => `<ul class="summary">${rows.map((r) => `<li><strong>${esc(r.item.name)}</strong><span>${esc(line(r))}</span></li>`).join('')}</ul>`;
+    const html = (buy.length ? `<h3>Added to the shopping list</h3>${list(buy)}` : '<p>Everything’s in the cupboard, so nothing needs buying.</p>')
+      + (have.length ? `<h3>Already got</h3>${list(have)}` : '');
+    const v = await ask({
+      title: `${res.meal.name} added`,
+      text: `${plural(res.meal.portions, 'portion')} planned for this week.`,
+      html,
+      buttons: [{ label: 'Done', value: 'ok', style: buy.length ? '' : 'primary' }, buy.length && { label: 'Shopping list', value: 'shop', style: 'primary' }].filter(Boolean),
+    });
+    go(v === 'shop' ? 'shopping' : 'week');
+  }
+
+  async function newWeekFlow() {
+    const n = state.week.meals.length;
+    const ok = await confirm('Start a new week?',
+      n ? `First confirm which of this week’s ${plural(n, 'meal')} you cooked. Then Stropping checks your short-life items.`
+        : 'No meals were planned this week. Stropping will check the short-life items in your cupboard.',
+      'Start');
+    if (!ok) return;
+    const res = await L.startNewWeek(state, flowAsk);
+    if (!res) { toast('Cancelled. Nothing was changed.'); return; }
+    commit(res.state);
+    go('week');
+    const s = res.summary;
+    const lines = [
+      s.cooked.length && `<li><strong>Cooked</strong><span>${esc(s.cooked.join(', '))}</span></li>`,
+      s.carried.length && `<li><strong>Kept for this week</strong><span>${esc(s.carried.join(', '))}</span></li>`,
+      s.dropped.length && `<li><strong>Dropped, ingredients back in the cupboard</strong><span>${esc(s.dropped.join(', '))}</span></li>`,
+      s.binned.length && `<li><strong>Thrown out</strong><span>${esc(s.binned.join(', '))}</span></li>`,
+    ].filter(Boolean);
+    const v = await ask({
+      title: 'New week started',
+      html: lines.length ? `<ul class="summary">${lines.join('')}</ul>` : '<p>All checked.</p>',
+      buttons: [{ label: 'Done', value: 'ok' }, { label: 'Plan meals', value: 'plan', style: 'primary' }],
+    });
+    if (v === 'plan') addMealSheet();
+  }
+
+  async function sweepFlow() {
+    if (!Object.keys(state.cupboard).length) { toast('The cupboard is empty.'); return; }
+    const res = await L.sweep(state, flowAsk);
+    commit(res.state);
+    toast(`Checked ${res.reviewed} of ${plural(res.total, 'item')}${res.removed ? `, ${res.removed} removed` : ''}.`);
+  }
+
+  // ---------- Sheets ----------
+
+  function addMealSheet(recipeId) {
+    if (!state.recipes.length) { toast('Add a recipe first.'); go('recipes'); return; }
+    const recipes = [...state.recipes].sort((a, b) => a.name.localeCompare(b.name));
+    const sel = recipes.find((r) => r.id === recipeId) || recipes[0];
+    openSheet({
+      title: 'Add a meal to this week',
+      html: `
+        <label class="field"><span>Recipe</span><select name="recipe">${recipes.map((r) => `<option value="${r.id}"${r === sel ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+        <label class="field"><span>Portions</span><input name="portions" type="number" min="1" step="1" inputmode="numeric" required value="${sel.serves}"></label>
+        <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Add to week</button></div>`,
+      onMount: (d, form) => {
+        form.recipe.addEventListener('change', () => {
+          const r = state.recipes.find((x) => x.id === form.recipe.value);
+          if (r) form.portions.value = r.serves;
+        });
+      },
+      onSubmit: (form) => {
+        const id = form.recipe.value;
+        const p = parseInt(form.portions.value, 10);
+        setTimeout(() => planFlow(id, p));
+      },
+    });
+  }
+
+  function viewRecipe(id) {
+    const r = state.recipes.find((x) => x.id === id);
+    if (!r) return;
+    let portions = r.serves;
+    const url = safeUrl(r.url);
+    const ingList = () => r.ingredients.map((g) => {
+      const item = L.itemById(state, g.itemId);
+      if (!item) return '';
+      const need = L.scaleQty(r, g.qty, portions);
+      const have = L.cupQty(state, item.id);
+      let status;
+      if (item.multiUse) status = have ? '<span class="ok">In cupboard</span>' : '<span class="need">Not in cupboard</span>';
+      else if (have >= need - L.EPS) status = '<span class="ok">In cupboard</span>';
+      else if (have > L.EPS) status = `<span class="need">Have ${esc(fmtQty(have, item.unit))}</span>`;
+      else status = '<span class="need">To buy</span>';
+      return `<li><span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span><span class="qty">${esc(fmtQty(need, item.unit))}${status}</span></li>`;
+    }).join('');
+    openSheet({
+      title: r.name,
+      html: `
+        ${url ? `<a class="ext" href="${esc(url)}" target="_blank" rel="noopener">${ICON.link}<span>Open recipe on ${esc(host(url))}</span></a>` : ''}
+        <div class="stepper"><span>Portions</span>
+          <button type="button" class="icon-btn" data-step="-1" aria-label="Fewer portions">−</button>
+          <output>${portions}</output>
+          <button type="button" class="icon-btn" data-step="1" aria-label="More portions">+</button>
+          <span class="sub">Recipe serves ${r.serves}</span>
+        </div>
+        ${r.ingredients.length ? `<ul class="ing-list">${ingList()}</ul>` : '<p class="hint">No ingredients yet.</p>'}
+        <div class="sheet-actions">
+          <button type="button" class="btn danger-text" data-del>Delete</button>
+          <span class="grow"></span>
+          <button type="button" class="btn" data-edit>Edit</button>
+          <button class="btn primary">Add to week</button>
+        </div>`,
+      onMount: (d) => {
+        d.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
+          portions = Math.max(1, portions + Number(b.dataset.step));
+          $('output', d).textContent = portions;
+          const ul = $('.ing-list', d);
+          if (ul) ul.innerHTML = ingList();
+        }));
+        $('[data-edit]', d).addEventListener('click', () => editRecipe(r.id));
+        $('[data-del]', d).addEventListener('click', async () => {
+          if (!(await confirm(`Delete ${r.name}?`, 'Meals already planned this week stay on the plan.', 'Delete', 'danger'))) return;
+          state.recipes = state.recipes.filter((x) => x.id !== r.id);
+          closeSheet();
+          commit();
+          toast('Recipe deleted.');
+        });
+      },
+      onSubmit: () => { setTimeout(() => planFlow(r.id, portions)); },
+    });
+  }
+
+  const ingRow = (name = '', qty = '', unit = 'each') => `<div class="ing-row">
+    <input class="ing-name" list="items-dl" placeholder="Ingredient" value="${esc(name)}" aria-label="Ingredient" autocomplete="off">
+    <input class="ing-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Qty" value="${esc(qty)}" aria-label="Quantity">
+    <select class="ing-unit" aria-label="Unit">${unitOptions(unit)}</select>
+    <button type="button" class="icon-btn" data-remove-row aria-label="Remove ingredient">${ICON.x}</button>
+  </div>`;
+
+  function editRecipe(id) {
+    const r = state.recipes.find((x) => x.id === id) || { name: '', url: '', serves: 4, ingredients: [] };
+    const rows = r.ingredients.map((g) => {
+      const item = L.itemById(state, g.itemId);
+      return item ? ingRow(item.name, num(g.qty), item.unit) : '';
+    }).join('') || ingRow();
+    openSheet({
+      title: id ? 'Edit recipe' : 'New recipe',
+      html: `
+        <label class="field"><span>Name</span><input name="name" required value="${esc(r.name)}" autocomplete="off"></label>
+        <label class="field"><span>Web link <em>optional</em></span><input name="url" type="text" inputmode="url" placeholder="https://…" value="${esc(r.url)}" autocomplete="off"></label>
+        <label class="field narrow"><span>Serves</span><input name="serves" type="number" min="1" step="1" inputmode="numeric" required value="${r.serves}"></label>
+        <fieldset class="ings"><legend>Ingredients</legend>
+          <div class="ing-rows">${rows}</div>
+          <button type="button" class="btn small" data-add-row>+ Add ingredient</button>
+          <p class="hint">Quantities are for the number of portions above. New names are added to your items list.</p>
+        </fieldset>
+        ${itemsDatalist()}
+        <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save recipe</button></div>`,
+      onMount: (d) => {
+        const sync = (row) => {
+          const item = L.findItemByName(state, $('.ing-name', row).value);
+          const sel = $('.ing-unit', row);
+          sel.disabled = !!item;
+          if (item) sel.value = item.unit;
+        };
+        $$('.ing-row', d).forEach(sync);
+        const rowsEl = $('.ing-rows', d);
+        rowsEl.addEventListener('input', (e) => {
+          if (e.target.classList.contains('ing-name')) sync(e.target.closest('.ing-row'));
+          if (e.target.classList.contains('ing-qty')) e.target.setCustomValidity('');
+        });
+        rowsEl.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-remove-row]');
+          if (!b) return;
+          b.closest('.ing-row').remove();
+          if (!$('.ing-row', rowsEl)) rowsEl.insertAdjacentHTML('beforeend', ingRow());
+        });
+        $('[data-add-row]', d).addEventListener('click', () => {
+          rowsEl.insertAdjacentHTML('beforeend', ingRow());
+          $('.ing-row:last-child .ing-name', rowsEl).focus();
+        });
+      },
+      onSubmit: (form) => {
+        const rowsData = $$('.ing-row', form).map((row) => ({
+          row,
+          name: $('.ing-name', row).value.trim(),
+          qty: parseFloat($('.ing-qty', row).value),
+          unit: $('.ing-unit', row).value,
+        })).filter((x) => x.name);
+        const bad = rowsData.find((x) => !(x.qty > 0));
+        if (bad) {
+          const q = $('.ing-qty', bad.row);
+          q.setCustomValidity(`Enter how much ${bad.name} is needed`);
+          q.reportValidity();
+          return false;
+        }
+        let url = form.url.value.trim();
+        if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
+        const data = {
+          name: form.name.value.trim(),
+          url,
+          serves: Math.max(1, parseInt(form.serves.value, 10) || 1),
+          ingredients: rowsData.map((x) => ({
+            itemId: (L.findItemByName(state, x.name) || L.addItem(state, { name: x.name, unit: x.unit })).id,
+            qty: L.round(x.qty),
+          })),
+        };
+        const existing = state.recipes.find((x) => x.id === id);
+        if (existing) Object.assign(existing, data);
+        else state.recipes.push({ id: L.uid(), ...data });
+        commit();
+        toast('Recipe saved.');
+        return true;
+      },
+    });
+  }
+
+  function editItem(id) {
+    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false };
+    const flag = (name, title, desc) => `<label class="toggle"><input type="checkbox" name="${name}"${item[name] ? ' checked' : ''}>
+      <span><strong>${title}</strong><small>${desc}</small></span></label>`;
+    openSheet({
+      title: id ? 'Edit item' : 'New item',
+      html: `
+        <label class="field"><span>Name</span><input name="name" required value="${esc(item.name)}" autocomplete="off"></label>
+        <div class="two">
+          <label class="field"><span>Unit</span><select name="unit">${unitOptions(item.unit)}</select></label>
+          <label class="field"><span>Category</span><select name="category">${catOptions(item.category)}</select></label>
+        </div>
+        <fieldset class="flags"><legend>Options</legend>
+          ${flag('frequent', 'Frequently used', 'Also used outside recipes, like milk. Before it’s taken from the cupboard you’ll be asked whether it’s really still there.')}
+          ${flag('shortLife', 'Short life', 'Goes off quickly, like chicken. If it isn’t used in a week, you’ll be asked to check it’s still in date.')}
+          ${flag('multiUse', 'Multi-use', 'Lasts for many meals, like spices. Tracked as in stock or not, and you’ll always be asked whether you have it.')}
+        </fieldset>
+        ${id ? '<p class="hint">Changing the unit doesn’t convert amounts already in the cupboard or on the list.</p>' : ''}
+        <div class="sheet-actions">
+          ${id ? '<button type="button" class="btn danger-text" data-del>Delete</button>' : ''}
+          <span class="grow"></span>
+          <button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save</button>
+        </div>`,
+      onMount: (d, form) => {
+        form.name.addEventListener('input', () => form.name.setCustomValidity(''));
+        const del = $('[data-del]', d);
+        if (del) del.addEventListener('click', async () => {
+          const used = L.itemUsage(state, id);
+          if (used.length) {
+            await ask({ title: `${item.name} is used in recipes`, text: `Remove it from ${used.map((r) => r.name).join(', ')} first.`, buttons: [{ label: 'OK', value: true, style: 'primary' }] });
+            return;
+          }
+          if (!(await confirm(`Delete ${item.name}?`, 'It will also be removed from the cupboard and shopping list.', 'Delete', 'danger'))) return;
+          L.deleteItem(state, id);
+          closeSheet();
+          commit();
+        });
+      },
+      onSubmit: (form) => {
+        const name = form.name.value.trim();
+        const clash = L.findItemByName(state, name);
+        if (clash && clash.id !== id) {
+          form.name.setCustomValidity('There’s already an item with this name');
+          form.name.reportValidity();
+          return false;
+        }
+        const data = {
+          name, unit: form.unit.value, category: form.category.value,
+          frequent: form.frequent.checked, shortLife: form.shortLife.checked, multiUse: form.multiUse.checked,
+        };
+        const existing = L.itemById(state, id);
+        if (existing) {
+          Object.assign(existing, data);
+          if (data.multiUse && L.cupQty(state, id) > 0) L.setCup(state, id, 1);
+        } else {
+          L.addItem(state, data);
+        }
+        commit();
+        return true;
+      },
+    });
+  }
+
+  /** Item name field with "create new item" options, plus a quantity. */
+  function pickerHtml(qtyLabel) {
+    return `
+      <label class="field"><span>Item</span><input name="item" list="items-dl" required autocomplete="off" placeholder="Start typing…"></label>
+      <div class="new-fields" hidden>
+        <p class="hint">New item. It will be added to your items list.</p>
+        <div class="two">
+          <label class="field"><span>Unit</span><select name="unit">${unitOptions('each')}</select></label>
+          <label class="field"><span>Category</span><select name="category">${catOptions('Other')}</select></label>
+        </div>
+      </div>
+      <label class="field qty-field"><span>${esc(qtyLabel)} <em data-unit></em></span><input name="qty" type="number" min="0" step="any" inputmode="decimal" required></label>
+      ${itemsDatalist()}`;
+  }
+
+  function mountPicker(d, form) {
+    const sync = () => {
+      const item = L.findItemByName(state, form.item.value);
+      $('.new-fields', d).hidden = !(form.item.value.trim() && !item);
+      $('[data-unit]', d).textContent = `(${item ? item.unit : form.unit.value})`;
+      const multi = !!(item && item.multiUse);
+      $('.qty-field', d).hidden = multi;
+      form.qty.required = !multi;
+    };
+    form.item.addEventListener('input', sync);
+    form.unit.addEventListener('change', sync);
+    sync();
+  }
+
+  function resolvePicked(form) {
+    const name = form.item.value.trim();
+    const item = L.findItemByName(state, name) || L.addItem(state, { name, unit: form.unit.value, category: form.category.value });
+    return { item, qty: item.multiUse ? 1 : parseFloat(form.qty.value) };
+  }
+
+  function addCupboardSheet() {
+    openSheet({
+      title: 'Add to the cupboard',
+      html: `${pickerHtml('Amount')}<div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Add</button></div>`,
+      onMount: mountPicker,
+      onSubmit: (form) => {
+        const { item, qty } = resolvePicked(form);
+        if (item.multiUse) L.setCup(state, item.id, 1);
+        else L.setCup(state, item.id, L.cupQty(state, item.id) + qty);
+        commit();
+        toast(`${item.name} added to the cupboard.`);
+        return true;
+      },
+    });
+  }
+
+  function addShoppingSheet() {
+    openSheet({
+      title: 'Add to the shopping list',
+      html: `${pickerHtml('Quantity')}<div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Add</button></div>`,
+      onMount: mountPicker,
+      onSubmit: (form) => {
+        const { item, qty } = resolvePicked(form);
+        L.addToShopping(state, item.id, qty, 0);
+        commit();
+        toast(`${item.name} added to the list.`);
+        return true;
+      },
+    });
+  }
+
+  function menuSheet() {
+    openSheet({
+      title: 'Stropping',
+      html: `
+        <div class="menu">
+          <button type="button" data-m="export"><strong>Back up data</strong><small>Download a file you can restore later or on another device.</small></button>
+          <button type="button" data-m="import"><strong>Restore from backup</strong><small>Replace everything here with a backup file.</small></button>
+          <button type="button" data-m="sample"><strong>Load sample data</strong><small>A few recipes and items to try things out.</small></button>
+          <button type="button" data-m="erase" class="danger"><strong>Erase all data</strong><small>Start again from scratch.</small></button>
+          <input type="file" accept="application/json,.json" hidden>
+        </div>
+        <details class="about"><summary>How it works</summary>
+          <p><strong>Plan a meal</strong> and Stropping takes what it can from the cupboard and adds the rest to the shopping list, scaled to your portions.</p>
+          <p><strong>Tick items off</strong> while shopping. What you buy for planned meals is set aside for them; anything extra goes into the cupboard.</p>
+          <p><strong>Start a new week</strong> to confirm what you cooked. Ingredients for uncooked meals go back in the cupboard, and short-life items get an in-date check.</p>
+          <p><strong>Sweep</strong> the cupboard now and then to bring it back in line with reality.</p>
+        </details>
+        <p class="hint">Your data is stored in this browser, on this device only. Back it up now and then.</p>`,
+      onMount: (d) => {
+        const file = $('input[type=file]', d);
+        d.querySelector('.menu').addEventListener('click', async (e) => {
+          const b = e.target.closest('[data-m]');
+          if (!b) return;
+          const m = b.dataset.m;
+          if (m === 'export') exportData();
+          if (m === 'import') file.click();
+          if (m === 'sample') { closeSheet(); loadSample(); }
+          if (m === 'erase') {
+            if (!(await confirm('Erase all data?', 'Recipes, items, cupboard and shopping list will all be deleted. This can’t be undone.', 'Erase', 'danger'))) return;
+            closeSheet();
+            commit(L.emptyState());
+            go('week');
+          }
+        });
+        file.addEventListener('change', async () => {
+          const f = file.files[0];
+          if (!f) return;
+          try {
+            const next = L.normalise(JSON.parse(await f.text()));
+            if (!(await confirm('Restore this backup?', `It has ${plural(next.recipes.length, 'recipe')} and ${plural(next.items.length, 'item')}. Everything currently here will be replaced.`, 'Restore'))) return;
+            closeSheet();
+            commit(next);
+            go('week');
+            toast('Backup restored.');
+          } catch (err) {
+            toast(`Couldn’t read that file. ${err.message || ''}`);
+          }
+          file.value = '';
+        });
+      },
+    });
+  }
+
+  function exportData() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `stropping-backup-${L.today()}.json`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  async function loadSample() {
+    const hasData = state.items.length || state.recipes.length;
+    if (hasData && !(await confirm('Replace your data?', 'Loading sample data replaces everything currently here.', 'Replace', 'danger'))) return;
+    commit(L.sampleState());
+    go('week');
+    toast('Sample data loaded. Try adding a meal.');
+  }
+
+  // ---------- Events ----------
+
+  const ACTIONS = {
+    menu: menuSheet,
+    go: (_, el) => go(el.dataset.tab),
+    sample: loadSample,
+    'add-meal': () => addMealSheet(),
+    'remove-meal': async (id) => {
+      const meal = state.week.meals.find((m) => m.id === id);
+      if (!meal) return;
+      if (!(await confirm(`Remove ${meal.name}?`, meal.cooked ? 'It’s marked as cooked, so nothing goes back in the cupboard.' : 'Its ingredients go back in the cupboard, and anything not yet bought comes off the list.', 'Remove'))) return;
+      if (meal.cooked) {
+        state.week.meals = state.week.meals.filter((m) => m.id !== id);
+        commit();
+      } else {
+        commit(L.removeMeal(state, id));
+      }
+    },
+    'new-week': newWeekFlow,
+    'new-recipe': () => editRecipe(null),
+    'view-recipe': viewRecipe,
+    'add-cupboard': addCupboardSheet,
+    'edit-cupboard': async (id) => {
+      const item = L.itemById(state, id);
+      if (!item) return;
+      if (item.multiUse) {
+        const v = await ask({ title: item.name, text: 'In stock. Mark it as run out?', buttons: [{ label: 'Cancel', value: null }, { label: 'Run out', value: 'gone', style: 'danger' }, { label: 'Run out, add to list', value: 'list', style: 'primary' }] });
+        if (!v) return;
+        L.setCup(state, id, 0);
+        if (v === 'list') L.addToShopping(state, id, 1, 0);
+        commit();
+        return;
+      }
+      const res = await ask({
+        title: item.name,
+        input: { label: `Amount in the cupboard (${item.unit})`, value: num(L.cupQty(state, id)) },
+        buttons: [{ label: 'Remove', value: 'remove', style: 'danger-text' }, { label: 'Cancel', value: null }, { label: 'Save', value: 'save', style: 'primary', needsInput: true }],
+      });
+      if (!res) return;
+      L.setCup(state, id, res.value === 'remove' ? 0 : res.input);
+      commit();
+    },
+    sweep: sweepFlow,
+    'add-shopping': addShoppingSheet,
+    'edit-shopping': async (id) => {
+      const e = state.shopping.find((x) => x.id === id);
+      const item = e && L.itemById(state, e.itemId);
+      if (!item) return;
+      const reservedNote = e.reserved > L.EPS ? `${fmtQty(e.reserved, item.unit)} of this is for this week’s meals.` : '';
+      const res = await ask({
+        title: item.name,
+        text: reservedNote,
+        input: item.multiUse || e.done ? null : { label: `Quantity to buy (${item.unit})`, value: num(L.buyQty(state, e)) },
+        buttons: [{ label: 'Remove from list', value: 'remove', style: 'danger-text' }, { label: 'Cancel', value: null },
+          ...(item.multiUse || e.done ? [] : [{ label: 'Save', value: 'save', style: 'primary', needsInput: true }])],
+      });
+      if (!res) return;
+      const action = typeof res === 'string' ? res : res.value;
+      if (action === 'remove') state.shopping = state.shopping.filter((x) => x !== e);
+      else {
+        e.qty = L.round(res.input);
+        e.reserved = Math.min(e.reserved, e.qty);
+        if (e.qty <= L.EPS) state.shopping = state.shopping.filter((x) => x !== e);
+      }
+      commit();
+    },
+    'clear-bought': () => { L.clearBought(state); commit(); },
+    'new-item': () => editItem(null),
+    'edit-item': editItem,
+    'item-to-list': async (id) => {
+      const item = L.itemById(state, id);
+      if (!item) return;
+      if (item.multiUse) {
+        L.addToShopping(state, id, 1, 0);
+        commit();
+        toast(`${item.name} added to the list.`);
+        return;
+      }
+      const res = await ask({
+        title: `Add ${item.name} to the list`,
+        input: { label: `Quantity (${item.unit})`, value: L.isCountUnit(item.unit) ? '1' : '' },
+        buttons: [{ label: 'Cancel', value: null }, { label: 'Add', value: 'add', style: 'primary', needsInput: true }],
+      });
+      if (!res || !(res.input > 0)) return;
+      L.addToShopping(state, id, res.input, 0);
+      commit();
+      toast(`${item.name} added to the list.`);
+    },
+  };
+
+  document.addEventListener('click', (e) => {
+    const tabBtn = e.target.closest('.tabbar [data-tab]');
+    if (tabBtn) { go(tabBtn.dataset.tab); return; }
+    const el = e.target.closest('[data-act]');
+    if (!el || el.tagName === 'INPUT' || el.closest('dialog')) return;
+    const fn = ACTIONS[el.dataset.act];
+    if (fn) fn(el.dataset.id, el);
+  });
+
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.matches('[data-act=cooked]')) { L.setCooked(state, el.dataset.id, el.checked); commit(); }
+    if (el.matches('[data-act=bought]')) { L.setBought(state, el.dataset.id, el.checked); commit(); }
+  });
+
+  document.addEventListener('input', (e) => {
+    if (e.target.matches('[data-filter]')) {
+      itemFilter = e.target.value;
+      applyItemFilter();
+    }
+  });
+
+  const sheet = $('#sheet');
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet || e.target.closest('[data-close]')) sheet.close();
+  });
+
+  render();
+
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
