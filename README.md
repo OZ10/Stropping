@@ -32,7 +32,13 @@ Without sharing set up, data is saved in the browser on each device (`localStora
 
 Stropping can keep everyone's phones in sync using [Firebase](https://firebase.google.com/). The free plan is far more than a household needs. The app stays on GitHub Pages; Firebase only stores the data and handles Google sign-in.
 
-### One-time setup (about 10 minutes)
+This copy is already connected to the Firebase project **`stropping-home`**: a Firestore database (Standard edition, `europe-west2` London), with the rules from `firestore.rules` deployed and the web app config in `firebase-config.js`. After changing the rules, redeploy them with:
+
+```
+npx -y firebase-tools@latest deploy --only firestore:rules
+```
+
+### One-time setup for a new Firebase project (about 10 minutes)
 
 1. Go to the [Firebase console](https://console.firebase.google.com/) and **Create a project**. You don't need Google Analytics.
 2. **Turn on Google sign-in:** *Build → Authentication → Get started → Sign-in method → Google → Enable → Save*.

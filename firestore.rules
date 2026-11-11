@@ -1,61 +1,325 @@
 rules_version = '2';
 
-// Stropping security rules. Paste into Firebase console → Firestore Database → Rules.
-// Only members of a household can see or change its data. Anyone signed in can
-// join a household, but only with an unexpired invite code created by a member.
+// ===============================================================
+// Stropping: Cloud Firestore Security Rules (prototype; review before wide use)
+// Project: stropping-home · Database: (default), Standard edition, europe-west2
+// Deploy with: npx -y firebase-tools@latest deploy --only firestore:rules
+// ===============================================================
+//
+// Access model: a "household" is a small group of trusted people. Every member
+// can read and edit all of the household's data. Non-members can never read or
+// write it, and the only way to become a member is with an unexpired invite
+// code created by an existing member. All client operations live in sync.js.
+//
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: Firebase Auth uid
+// Fields:
+//   - householdId: string (≤ 64) | null (required) - household this user is in
+//
+// Collection: households
+// Document ID: Firestore auto-ID
+// Fields:
+//   - name: string (required, 1–100) - household name shown to members
+//   - members: list<uid> (required, ≤ 20) - who can access the household
+//   - memberInfo: map<uid, {name: string 1–100}> (required, ≤ 20 entries) - display names
+//   - createdBy: uid (required, immutable) - creator
+//   - createdAt: timestamp (required, immutable, server time at creation)
+//   - joinCode: string (optional, 8 chars A–Z/2–9) - invite code presented by the last joiner
+//
+// Subcollections: households/{hid}/{collection}/{docId}, collection is one of:
+//   items/{id}:    id (== docId), name (1–100), unit (enum), category (enum),
+//                  frequent, shortLife, multiUse (bool); all required
+//   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
+//                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty})
+//   shopping/{id}: id (== docId), itemId (string ≤ 64), qty, reserved, added
+//                  (number 0–1,000,000), done (bool)
+//   cupboard/{itemId}: qty (number 0–1,000,000)
+//   meals/{id}:    id (== docId), recipeId (string ≤ 64), name (1–200), url,
+//                  portions (number 1–1000), cooked (bool), at (number ≥ 0, ms),
+//                  alloc (list ≤ 100 of {itemId, need, fromCupboard, toShop})
+//   meta/week:     id (string ≤ 64), start ('YYYY-MM-DD'),
+//                  lastWeek (null | {start, cooked, carried, dropped, binned}; lists ≤ 100)
+//
+// Collection: invites
+// Document ID: 8-char code from A–Z and 2–9 (random, ~40 bits)
+// Fields (all required, document immutable once created):
+//   - householdId: string - household the code grants entry to
+//   - createdBy: uid - member who created it (must be the caller)
+//   - createdAt: timestamp - server time at creation
+//   - expiresAt: timestamp - in the future, at most 8 days ahead
+//
+// Known limitation: rules cannot loop over lists, so the *elements* of
+// recipes.ingredients, meals.alloc and lastWeek lists are size-capped but not
+// individually type-checked. Only household members can write them.
+// ===============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
+    // =============================================================
+    // Helper Functions
+    // =============================================================
+
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isMember(hid) {
-      return signedIn()
-        && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.members;
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function validInvite(code, hid) {
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // The creator field must be the caller on create...
+    function uidUnchanged() {
+      return incoming().createdBy == request.auth.uid;
+    }
+
+    // ...and can never change afterwards.
+    function uidNotModified() {
+      return incoming().createdBy == existing().createdBy;
+    }
+
+    function hasExactFields(d, fields) {
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields);
+    }
+
+    function isShortString(v, minLen, maxLen) {
+      return v is string && v.size() >= minLen && v.size() <= maxLen;
+    }
+
+    function isId(v) {
+      return isShortString(v, 1, 64);
+    }
+
+    function isAmount(v) {
+      return v is number && v >= 0 && v <= 1000000;
+    }
+
+    function isValidUrlOrEmpty(v) {
+      return v is string && v.size() <= 2048 && (v == '' || v.matches('^https?://.+'));
+    }
+
+    function isValidList(v, maxSize) {
+      return v is list && v.size() <= maxSize;
+    }
+
+    function isDateString(v) {
+      return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isInviteCode(c) {
+      return c is string && c.matches('^[A-Z2-9]{8}$');
+    }
+
+    function householdPath(hid) {
+      return /databases/$(database)/documents/households/$(hid);
+    }
+
+    // Membership is read from the household document, never from the request.
+    function isMemberOf(hid) {
+      return isAuthenticated() && request.auth.uid in get(householdPath(hid)).data.members;
+    }
+
+    function isValidInvite(code, hid) {
       let path = /databases/$(database)/documents/invites/$(code);
-      return exists(path)
+      return isInviteCode(code)
+        && exists(path)
         && get(path).data.householdId == hid
         && get(path).data.expiresAt > request.time;
     }
 
-    // Which household each user belongs to.
+    // =============================================================
+    // Domain Validators (used on both create and update)
+    // =============================================================
+
+    function isValidUserDoc(d) {
+      return hasExactFields(d, ['householdId'])
+        && (d.householdId == null || isId(d.householdId));
+    }
+
+    function isValidMemberInfoEntry(m) {
+      return m is map && hasExactFields(m, ['name']) && isShortString(m.name, 1, 100);
+    }
+
+    function isValidHousehold(d) {
+      return d.keys().hasAll(['name', 'members', 'memberInfo', 'createdBy', 'createdAt'])
+        && d.keys().hasOnly(['name', 'members', 'memberInfo', 'createdBy', 'createdAt', 'joinCode'])
+        && isShortString(d.name, 1, 100)
+        && isValidList(d.members, 20)
+        && d.memberInfo is map && d.memberInfo.size() <= 20
+        && isId(d.createdBy)
+        && d.createdAt is timestamp
+        && (!('joinCode' in d) || isInviteCode(d.joinCode));
+    }
+
+    function isValidItem(docId, d) {
+      return hasExactFields(d, ['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse'])
+        && d.id == docId
+        && isShortString(d.name, 1, 100)
+        && d.unit in ['each', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice', 'pinch']
+        && d.category in ['Fruit & veg', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Cupboard', 'Herbs & spices', 'Frozen', 'Drinks', 'Household', 'Other']
+        && d.frequent is bool && d.shortLife is bool && d.multiUse is bool;
+    }
+
+    function isValidRecipe(docId, d) {
+      return hasExactFields(d, ['id', 'name', 'url', 'serves', 'ingredients'])
+        && d.id == docId
+        && isShortString(d.name, 1, 200)
+        && isValidUrlOrEmpty(d.url)
+        && d.serves is number && d.serves >= 1 && d.serves <= 1000
+        && isValidList(d.ingredients, 100);
+    }
+
+    function isValidShoppingEntry(docId, d) {
+      return hasExactFields(d, ['id', 'itemId', 'qty', 'reserved', 'done', 'added'])
+        && d.id == docId
+        && isId(d.itemId)
+        && isAmount(d.qty) && isAmount(d.reserved) && isAmount(d.added)
+        && d.done is bool;
+    }
+
+    function isValidCupboardEntry(d) {
+      return hasExactFields(d, ['qty']) && isAmount(d.qty);
+    }
+
+    function isValidMeal(docId, d) {
+      return hasExactFields(d, ['id', 'recipeId', 'name', 'url', 'portions', 'cooked', 'at', 'alloc'])
+        && d.id == docId
+        && isId(d.recipeId)
+        && isShortString(d.name, 1, 200)
+        && isValidUrlOrEmpty(d.url)
+        && d.portions is number && d.portions >= 1 && d.portions <= 1000
+        && d.cooked is bool
+        && d.at is number && d.at >= 0
+        && isValidList(d.alloc, 100);
+    }
+
+    function isValidLastWeek(w) {
+      return w == null || (
+        w is map
+        && hasExactFields(w, ['start', 'cooked', 'carried', 'dropped', 'binned'])
+        && isDateString(w.start)
+        && isValidList(w.cooked, 100) && isValidList(w.carried, 100)
+        && isValidList(w.dropped, 100) && isValidList(w.binned, 100)
+      );
+    }
+
+    function isValidWeekMeta(d) {
+      return hasExactFields(d, ['id', 'start', 'lastWeek'])
+        && isId(d.id)
+        && isDateString(d.start)
+        && isValidLastWeek(d.lastWeek);
+    }
+
+    function isHouseholdCollection(collection) {
+      return collection in ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
+    }
+
+    function isValidHouseholdDoc(collection, docId, d) {
+      return (collection == 'items' && isValidItem(docId, d))
+        || (collection == 'recipes' && isValidRecipe(docId, d))
+        || (collection == 'shopping' && isValidShoppingEntry(docId, d))
+        || (collection == 'cupboard' && isValidCupboardEntry(d))
+        || (collection == 'meals' && isValidMeal(docId, d))
+        || (collection == 'meta' && docId == 'week' && isValidWeekMeta(d));
+    }
+
+    // A member removes only themselves (and their display name); nothing else changes.
+    function isLeaving() {
+      let uid = request.auth.uid;
+      return uid in existing().members
+        && incoming().diff(existing()).affectedKeys().hasOnly(['members', 'memberInfo'])
+        && !(uid in incoming().members)
+        && existing().members.removeAll(incoming().members) == [uid]
+        && incoming().members.removeAll(existing().members).size() == 0
+        && incoming().memberInfo.diff(existing().memberInfo).affectedKeys().hasOnly([uid])
+        && !(uid in incoming().memberInfo);
+    }
+
+    // The caller adds only themselves (and their display name), keeps every
+    // existing member, and presents a valid invite for THIS household.
+    // Also covers an existing member re-joining with a valid invite.
+    function isJoining(hid) {
+      let uid = request.auth.uid;
+      return incoming().diff(existing()).affectedKeys().hasOnly(['members', 'memberInfo', 'joinCode'])
+        && uid in incoming().members
+        && incoming().members.removeAll(existing().members).hasOnly([uid])
+        && existing().members.removeAll(incoming().members).size() == 0
+        && incoming().memberInfo.diff(existing().memberInfo).affectedKeys().hasOnly([uid])
+        && isValidMemberInfoEntry(incoming().memberInfo[uid])
+        && isValidInvite(incoming().joinCode, hid);
+    }
+
+    // =============================================================
+    // Rules
+    // =============================================================
+
+    // Which household each user belongs to: private to that user.
     match /users/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidUserDoc(incoming());
+      allow delete: if isOwner(uid);
     }
 
     match /households/{hid} {
-      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow read: if isAuthenticated() && request.auth.uid in existing().members;
 
-      // You can only create a household with yourself as the sole member.
-      allow create: if signedIn() && request.resource.data.members == [request.auth.uid];
+      // Create a household with yourself as the only member.
+      allow create: if isAuthenticated()
+        && isValidHousehold(incoming())
+        && incoming().keys().hasOnly(['name', 'members', 'memberInfo', 'createdBy', 'createdAt'])
+        && incoming().members == [request.auth.uid]
+        && uidUnchanged()
+        && incoming().createdAt == request.time
+        && incoming().memberInfo.keys().hasOnly([request.auth.uid])
+        && isValidMemberInfoEntry(incoming().memberInfo[request.auth.uid]);
 
-      // Members can change anything, including leaving.
-      allow update: if signedIn() && request.auth.uid in resource.data.members;
+      // The only changes allowed are joining (with an invite) and leaving.
+      allow update: if isAuthenticated()
+        && isValidHousehold(incoming())
+        && uidNotModified()
+        && incoming().createdAt == existing().createdAt
+        && (isLeaving() || isJoining(hid));
 
-      // Joining: add only yourself, keep everyone else, and present a valid invite.
-      allow update: if signedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberInfo', 'joinCode'])
-        && request.resource.data.members.removeAll(resource.data.members).hasOnly([request.auth.uid])
-        && resource.data.members.removeAll(request.resource.data.members).size() == 0
-        && validInvite(request.resource.data.joinCode, hid);
+      allow delete: if false;
 
-      // Recipes, items, cupboard, shopping list, meals, week info.
+      // Recipes, items, cupboard, shopping list, meals and week info.
       match /{collection}/{docId} {
-        allow read, write: if isMember(hid);
+        allow read: if isHouseholdCollection(collection) && isMemberOf(hid);
+        allow create, update: if isMemberOf(hid) && isValidHouseholdDoc(collection, docId, incoming());
+        allow delete: if isHouseholdCollection(collection) && isMemberOf(hid);
       }
     }
 
-    // Invite codes are long and random; you must know one to read it.
+    // Invite codes: readable one at a time by anyone signed in who knows the
+    // code (needed to join); never listable, never editable.
     match /invites/{code} {
-      allow get: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.createdBy == request.auth.uid
-        && isMember(request.resource.data.householdId);
-      allow delete: if signedIn() && isMember(resource.data.householdId);
+      allow get: if isAuthenticated() && isInviteCode(code);
+      allow list: if false;
+      allow create: if isAuthenticated()
+        && isInviteCode(code)
+        && hasExactFields(incoming(), ['householdId', 'createdBy', 'createdAt', 'expiresAt'])
+        && isId(incoming().householdId)
+        && uidUnchanged()
+        && incoming().createdAt == request.time
+        && incoming().expiresAt is timestamp
+        && incoming().expiresAt > request.time
+        && incoming().expiresAt <= request.time + duration.value(8, 'd')
+        && isMemberOf(incoming().householdId);
+      allow update, delete: if false;
     }
+
+    // Everything else is denied by default.
   }
 }

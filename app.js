@@ -418,7 +418,7 @@
         <h2>${esc(title)}</h2>
         ${text ? `<p>${esc(text)}</p>` : ''}${html}
         ${input ? `<label class="field"><span>${esc(input.label)}</span>${input.type === 'text'
-          ? `<input name="v" type="text" autocomplete="off" autocapitalize="${input.caps || 'sentences'}" value="${esc(input.value)}">`
+          ? `<input name="v" type="text" autocomplete="off" maxlength="${input.maxlength || 100}" autocapitalize="${input.caps || 'sentences'}" value="${esc(input.value)}">`
           : `<input name="v" type="number" min="0" step="any" inputmode="decimal" value="${esc(input.value)}">`}</label>` : ''}
         <div class="prompt-actions${stack ? ' stack' : ''}">${buttons.map((b, i) => `<button type="button" class="btn ${b.style || ''}" data-i="${i}">${esc(b.label)}</button>`).join('')}</div>
       </form>`;
@@ -687,7 +687,7 @@
   }
 
   const ingRow = (name = '', qty = '', unit = 'each') => `<div class="ing-row">
-    <input class="ing-name" list="items-dl" placeholder="Ingredient" value="${esc(name)}" aria-label="Ingredient" autocomplete="off">
+    <input class="ing-name" list="items-dl" maxlength="100" placeholder="Ingredient" value="${esc(name)}" aria-label="Ingredient" autocomplete="off">
     <input class="ing-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Qty" value="${esc(qty)}" aria-label="Quantity">
     <select class="ing-unit" aria-label="Unit">${unitOptions(unit)}</select>
     <button type="button" class="icon-btn" data-remove-row aria-label="Remove ingredient">${ICON.x}</button>
@@ -702,8 +702,8 @@
     openSheet({
       title: id ? 'Edit recipe' : 'New recipe',
       html: `
-        <label class="field"><span>Name</span><input name="name" required value="${esc(r.name)}" autocomplete="off"></label>
-        <label class="field"><span>Web link <em>optional</em></span><input name="url" type="text" inputmode="url" placeholder="https://…" value="${esc(r.url)}" autocomplete="off"></label>
+        <label class="field"><span>Name</span><input name="name" required maxlength="200" value="${esc(r.name)}" autocomplete="off"></label>
+        <label class="field"><span>Web link <em>optional</em></span><input name="url" type="text" inputmode="url" maxlength="2000" placeholder="https://…" value="${esc(r.url)}" autocomplete="off"></label>
         <label class="field narrow"><span>Serves</span><input name="serves" type="number" min="1" step="1" inputmode="numeric" required value="${r.serves}"></label>
         <fieldset class="ings"><legend>Ingredients</legend>
           <div class="ing-rows">${rows}</div>
@@ -778,7 +778,7 @@
     openSheet({
       title: id ? 'Edit item' : 'New item',
       html: `
-        <label class="field"><span>Name</span><input name="name" required value="${esc(item.name)}" autocomplete="off"></label>
+        <label class="field"><span>Name</span><input name="name" required maxlength="100" value="${esc(item.name)}" autocomplete="off"></label>
         <div class="two">
           <label class="field"><span>Unit</span><select name="unit">${unitOptions(item.unit)}</select></label>
           <label class="field"><span>Category</span><select name="category">${catOptions(item.category)}</select></label>
@@ -837,7 +837,7 @@
   /** Item name field with "create new item" options, plus a quantity. */
   function pickerHtml(qtyLabel) {
     return `
-      <label class="field"><span>Item</span><input name="item" list="items-dl" required autocomplete="off" placeholder="Start typing…"></label>
+      <label class="field"><span>Item</span><input name="item" list="items-dl" required maxlength="100" autocomplete="off" placeholder="Start typing…"></label>
       <div class="new-fields" hidden>
         <p class="hint">New item. It will be added to your items list.</p>
         <div class="two">

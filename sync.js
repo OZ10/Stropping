@@ -53,7 +53,8 @@ async function start() {
 
   const name = () => {
     const u = auth.currentUser;
-    return (u && (u.displayName || (u.email || '').split('@')[0])) || 'Someone';
+    // Shown to other household members; firestore.rules caps it at 100 chars.
+    return ((u && (u.displayName || (u.email || '').split('@')[0])) || 'Someone').slice(0, 100);
   };
 
   function fail(err) {
