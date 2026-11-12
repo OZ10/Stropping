@@ -8,7 +8,7 @@
  *
  * State shape:
  *   items:    [{ id, name, unit, category, frequent, shortLife, multiUse }]
- *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty }] }]
+ *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty }], instructions }]
  *   cupboard: { [itemId]: qty }            multi-use items: 1 = in stock
  *   shopping: [{ id, itemId, qty, reserved, done, added }]
  *             reserved = amount already promised to planned meals
@@ -26,7 +26,10 @@
   const CATEGORIES = ['Fruit & veg', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Cupboard', 'Herbs & spices', 'Frozen', 'Drinks', 'Household', 'Other'];
   const EPS = 1e-6;
 
-  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
+  const cleanInstructions = (v) => (typeof v === 'string' ? v.slice(0, MAX_INSTRUCTIONS) : '');
+
+  const uid = () =>Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -65,6 +68,7 @@
       ingredients: (Array.isArray(r.ingredients) ? r.ingredients : [])
         .filter((g) => g && ids.has(g.itemId))
         .map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
+      instructions: cleanInstructions(r.instructions),
     }));
     for (const [id, q] of Object.entries(raw.cupboard || {})) {
       if (ids.has(id) && Number(q) > EPS) s.cupboard[id] = round(q);
@@ -429,14 +433,18 @@
       oil: add('Olive oil', 'tbsp', 'Cupboard', { multiUse: true }),
       kitchenRoll: add('Kitchen roll', 'pack', 'Household'),
     };
-    const recipe = (name, serves, list) => s.recipes.push({
-      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty]) => ({ itemId, qty })),
+    const recipe = (name, serves, list, instructions = '') => s.recipes.push({
+      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty]) => ({ itemId, qty })), instructions,
     });
     recipe('Chicken curry', 4, [[i.chicken, 500], [i.onion, 1], [i.garlic, 3], [i.tomatoes, 1], [i.coconut, 1],
       [i.cumin, 2], [i.paprika, 1], [i.oil, 1], [i.spinach, 100], [i.rice, 300]]);
     recipe('Spaghetti bolognese', 4, [[i.mince, 500], [i.onion, 1], [i.garlic, 2], [i.tomatoes, 2], [i.pasta, 400],
       [i.oil, 1], [i.cheddar, 50]]);
-    recipe('Pancakes', 2, [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20]]);
+    recipe('Pancakes', 2, [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20]],
+      '1. Whisk the flour, eggs and milk into a smooth batter. Rest for 10 minutes.\n'
+      + '2. Melt a little butter in a frying pan over a medium heat.\n'
+      + '3. Pour in a thin layer of batter, cook for about a minute, flip and cook the other side.\n'
+      + '4. Repeat with the rest of the batter.');
     Object.assign(s.cupboard, {
       [i.rice]: 1000, [i.pasta]: 500, [i.onion]: 3, [i.garlic]: 6, [i.tomatoes]: 2, [i.flour]: 1000,
       [i.milk]: 1000, [i.eggs]: 6, [i.butter]: 250, [i.cumin]: 1, [i.paprika]: 1, [i.oil]: 1, [i.chicken]: 500,
@@ -493,6 +501,7 @@
         s.recipes.push({
           id, name: String(data.name || ''), url: data.url || '', serves: Number(data.serves) > 0 ? Number(data.serves) : 1,
           ingredients: (Array.isArray(data.ingredients) ? data.ingredients : []).map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
+          instructions: cleanInstructions(data.instructions),
         });
       } else if (coll === 'shopping') {
         s.shopping.push({ id, itemId: data.itemId, qty: round(data.qty), reserved: round(data.reserved), done: !!data.done, added: round(data.added) });
@@ -538,7 +547,7 @@
   }
 
   const api = {
-    UNITS, CATEGORIES, EPS, uid, round, today, emptyState, normalise, sampleState,
+    UNITS, CATEGORIES, EPS, MAX_INSTRUCTIONS, uid, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,

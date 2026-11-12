@@ -34,7 +34,8 @@ rules_version = '2';
 //   items/{id}:    id (== docId), name (1–100), unit (enum), category (enum),
 //                  frequent, shortLife, multiUse (bool); all required
 //   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
-//                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty})
+//                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty}),
+//                  instructions (optional string ≤ 20,000)
 //   shopping/{id}: id (== docId), itemId (string ≤ 64), qty, reserved, added
 //                  (number 0–1,000,000), done (bool)
 //   cupboard/{itemId}: qty (number 0–1,000,000)
@@ -173,12 +174,14 @@ service cloud.firestore {
     }
 
     function isValidRecipe(docId, d) {
-      return hasExactFields(d, ['id', 'name', 'url', 'serves', 'ingredients'])
+      return d.keys().hasAll(['id', 'name', 'url', 'serves', 'ingredients'])
+        && d.keys().hasOnly(['id', 'name', 'url', 'serves', 'ingredients', 'instructions'])
         && d.id == docId
         && isShortString(d.name, 1, 200)
         && isValidUrlOrEmpty(d.url)
         && d.serves is number && d.serves >= 1 && d.serves <= 1000
-        && isValidList(d.ingredients, 100);
+        && isValidList(d.ingredients, 100)
+        && (!('instructions' in d) || isShortString(d.instructions, 0, 20000));
     }
 
     function isValidShoppingEntry(docId, d) {

@@ -663,6 +663,7 @@
           <span class="sub">Recipe serves ${r.serves}</span>
         </div>
         ${r.ingredients.length ? `<ul class="ing-list">${ingList()}</ul>` : '<p class="hint">No ingredients yet.</p>'}
+        ${r.instructions ? `<section class="method"><h3>Instructions</h3><div class="method-text">${esc(r.instructions)}</div></section>` : ''}
         <div class="sheet-actions">
           <button type="button" class="btn danger-text" data-del>Delete</button>
           <span class="grow"></span>
@@ -697,7 +698,7 @@
   </div>`;
 
   function editRecipe(id) {
-    const r = state.recipes.find((x) => x.id === id) || { name: '', url: '', serves: 4, ingredients: [] };
+    const r = state.recipes.find((x) => x.id === id) || { name: '', url: '', serves: 4, ingredients: [], instructions: '' };
     const rows = r.ingredients.map((g) => {
       const item = L.itemById(state, g.itemId);
       return item ? ingRow(item.name, num(g.qty), item.unit) : '';
@@ -713,6 +714,9 @@
           <button type="button" class="btn small" data-add-row>+ Add ingredient</button>
           <p class="hint">Quantities are for the number of portions above. New names are added to your items list.</p>
         </fieldset>
+        <label class="field"><span>Instructions <em>optional</em></span>
+          <textarea name="instructions" rows="8" maxlength="${L.MAX_INSTRUCTIONS}" placeholder="Method, tips, cooking times…">${esc(r.instructions || '')}</textarea>
+        </label>
         ${itemsDatalist()}
         <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save recipe</button></div>`,
       onMount: (d) => {
@@ -763,6 +767,7 @@
             itemId: (L.findItemByName(state, x.name) || L.addItem(state, { name: x.name, unit: x.unit })).id,
             qty: L.round(x.qty),
           })),
+          instructions: form.instructions.value.replace(/\s+$/, '').slice(0, L.MAX_INSTRUCTIONS),
         };
         const existing = state.recipes.find((x) => x.id === id);
         if (existing) Object.assign(existing, data);

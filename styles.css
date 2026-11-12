@@ -258,6 +258,13 @@ input, select { font: inherit; color: var(--text); }
   border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
 }
 .ing-row select:disabled { opacity: .7; }
+textarea {
+  width: 100%; min-height: 160px; padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  font: inherit; color: var(--text); line-height: 1.5;
+}
+.method h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 8px; }
+.method-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
 legend { font-size: .85rem; font-weight: 650; color: var(--muted); padding: 0; margin-bottom: 8px; }
