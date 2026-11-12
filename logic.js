@@ -16,14 +16,23 @@
  *   week:     { id, start, meals: [{ id, recipeId, name, url, portions, cooked,
  *               alloc: [{ itemId, need, fromCupboard, toShop }] }] }
  *   lastWeek: summary of the previous week, or null
+ *   settings: { customUnits: [{ name, count }], categories: [name] }
+ *             household's own units (count = bought in whole numbers) and
+ *             category list in shopping-list order ("Other" always present)
  */
 (function (root) {
   'use strict';
 
-  const UNITS = ['each', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice', 'pinch'];
-  // Units you can only buy whole numbers of.
+  // Built-in units. Households can add their own (settings.customUnits).
+  const UNITS = ['each', 'g', 'kg', 'ml', 'l', 'pint', 'tsp', 'tbsp', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice', 'pinch'];
+  // Built-in units you can only buy whole numbers of.
   const COUNT_UNITS = new Set(['each', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice']);
+  // Default categories, in shopping-list order. Households can edit them (settings.categories).
   const CATEGORIES = ['Fruit & veg', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Cupboard', 'Herbs & spices', 'Frozen', 'Drinks', 'Household', 'Other'];
+  const FALLBACK_CATEGORY = 'Other'; // always present; can't be renamed or deleted
+  const MAX_CUSTOM = 50; // max custom units, and max categories (also in firestore.rules)
+  const MAX_UNIT_NAME = 20;
+  const MAX_CATEGORY_NAME = 50;
   const EPS = 1e-6;
 
   const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
@@ -31,7 +40,7 @@
   // Default amount to buy/stock for an item; 0 means "no default set".
   const cleanDefault = (v) => (Number(v) > 0 ? Math.min(round(v), 1000000) : 0);
 
-  const uid = () =>Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -42,9 +51,110 @@
 
   const newWeek = (meals = []) => ({ id: uid(), start: today(), meals });
 
-  function emptyState() {
-    return { version: 1, items: [], recipes: [], cupboard: {}, shopping: [], week: newWeek(), lastWeek: null };
+  // ---------- Settings: custom units and editable categories ----------
+
+  const defaultSettings = () => ({ customUnits: [], categories: [...CATEGORIES] });
+
+  /** Sanitise settings from storage or sync: trims, de-duplicates, caps sizes, keeps "Other". */
+  function cleanSettings(raw) {
+    const out = defaultSettings();
+    if (!raw || typeof raw !== 'object') return out;
+    const taken = new Set(UNITS);
+    out.customUnits = (Array.isArray(raw.customUnits) ? raw.customUnits : [])
+      .map((u) => ({ name: String((u && u.name) || '').trim().slice(0, MAX_UNIT_NAME), count: !!(u && u.count) }))
+      .filter((u) => {
+        const key = u.name.toLowerCase();
+        if (!u.name || taken.has(key)) return false;
+        taken.add(key);
+        return true;
+      })
+      .slice(0, MAX_CUSTOM);
+    if (Array.isArray(raw.categories)) {
+      const seen = new Set();
+      let cats = [];
+      for (const c of raw.categories) {
+        const n = String(c || '').trim().slice(0, MAX_CATEGORY_NAME);
+        if (n && !seen.has(n.toLowerCase())) {
+          seen.add(n.toLowerCase());
+          cats.push(n);
+        }
+      }
+      cats = cats.slice(0, MAX_CUSTOM);
+      if (!cats.includes(FALLBACK_CATEGORY)) cats = [...cats.slice(0, MAX_CUSTOM - 1), FALLBACK_CATEGORY];
+      out.categories = cats;
+    }
+    return out;
   }
+
+  function emptyState() {
+    return { version: 1, items: [], recipes: [], cupboard: {}, shopping: [], week: newWeek(), lastWeek: null, settings: defaultSettings() };
+  }
+
+  const unitsFor = (s) => [...UNITS, ...s.settings.customUnits.map((u) => u.name)];
+  const categoriesFor = (s) => s.settings.categories;
+  const validUnit = (s, unit) => (unitsFor(s).includes(unit) ? unit : 'each');
+  const validCategory = (s, cat) => (categoriesFor(s).includes(cat) ? cat : FALLBACK_CATEGORY);
+  const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+
+  function addUnit(s, name, count) {
+    const n = String(name || '').trim();
+    if (!n) throw new Error('Enter a name for the unit.');
+    if (n.length > MAX_UNIT_NAME) throw new Error(`Unit names can be up to ${MAX_UNIT_NAME} characters.`);
+    if (unitsFor(s).some((u) => sameName(u, n))) throw new Error(`There’s already a unit called “${n}”.`);
+    if (s.settings.customUnits.length >= MAX_CUSTOM) throw new Error(`You can have up to ${MAX_CUSTOM} of your own units.`);
+    s.settings.customUnits.push({ name: n, count: !!count });
+  }
+
+  const unitUsage = (s, name) => s.items.filter((i) => i.unit === name);
+
+  function removeUnit(s, name) {
+    const used = unitUsage(s, name);
+    if (used.length) throw new Error(`${name} is used by ${used.length === 1 ? used[0].name : `${used.length} items`}. Change ${used.length === 1 ? 'its' : 'their'} unit first.`);
+    s.settings.customUnits = s.settings.customUnits.filter((u) => u.name !== name);
+  }
+
+  function checkCategoryName(s, name, except) {
+    const n = String(name || '').trim();
+    if (!n) throw new Error('Enter a name for the category.');
+    if (n.length > MAX_CATEGORY_NAME) throw new Error(`Category names can be up to ${MAX_CATEGORY_NAME} characters.`);
+    if (categoriesFor(s).some((c) => c !== except && sameName(c, n))) throw new Error(`There’s already a category called “${n}”.`);
+    return n;
+  }
+
+  /** New categories go just above "Other". */
+  function addCategory(s, name) {
+    const n = checkCategoryName(s, name);
+    if (s.settings.categories.length >= MAX_CUSTOM) throw new Error(`You can have up to ${MAX_CUSTOM} categories.`);
+    const at = s.settings.categories.indexOf(FALLBACK_CATEGORY);
+    s.settings.categories.splice(at < 0 ? s.settings.categories.length : at, 0, n);
+    return n;
+  }
+
+  /** Rename a category and move its items with it. */
+  function renameCategory(s, from, to) {
+    if (from === FALLBACK_CATEGORY) throw new Error(`“${FALLBACK_CATEGORY}” can’t be renamed.`);
+    const n = checkCategoryName(s, to, from);
+    s.settings.categories = s.settings.categories.map((c) => (c === from ? n : c));
+    for (const i of s.items) if (i.category === from) i.category = n;
+    return n;
+  }
+
+  /** Delete a category; its items move to "Other". */
+  function removeCategory(s, name) {
+    if (name === FALLBACK_CATEGORY) throw new Error(`“${FALLBACK_CATEGORY}” can’t be deleted.`);
+    s.settings.categories = s.settings.categories.filter((c) => c !== name);
+    for (const i of s.items) if (i.category === name) i.category = FALLBACK_CATEGORY;
+  }
+
+  function moveCategory(s, name, delta) {
+    const list = s.settings.categories;
+    const from = list.indexOf(name);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= list.length) return;
+    [list[from], list[to]] = [list[to], list[from]];
+  }
+
+  const categoryUsage = (s, name) => s.items.filter((i) => i.category === name);
 
   /** Validate and fill defaults on loaded or imported data. Throws on junk. */
   function normalise(raw) {
@@ -52,11 +162,12 @@
       throw new Error('This does not look like Stropping data.');
     }
     const s = emptyState();
+    s.settings = cleanSettings(raw.settings);
     s.items = raw.items.filter((i) => i && i.id && i.name).map((i) => ({
       id: String(i.id),
       name: String(i.name),
-      unit: UNITS.includes(i.unit) ? i.unit : 'each',
-      category: CATEGORIES.includes(i.category) ? i.category : 'Other',
+      unit: validUnit(s, i.unit),
+      category: validCategory(s, i.category),
       frequent: !!i.frequent,
       shortLife: !!i.shortLife,
       multiUse: !!i.multiUse,
@@ -113,8 +224,8 @@
     if (existing) return existing;
     const item = {
       id: uid(), name: String(name).trim(),
-      unit: UNITS.includes(unit) ? unit : 'each',
-      category: CATEGORIES.includes(category) ? category : 'Other',
+      unit: validUnit(s, unit),
+      category: validCategory(s, category),
       frequent: !!frequent, shortLife: !!shortLife, multiUse: !!multiUse,
       defaultQty: cleanDefault(defaultQty),
       frequentBuy: !!frequentBuy,
@@ -132,10 +243,11 @@
     s.shopping = s.shopping.filter((e) => e.itemId !== id);
   }
 
-  const isCountUnit = (unit) => COUNT_UNITS.has(unit);
+  /** Units bought in whole numbers: built-in countable units plus custom units marked as such. */
+  const isCountUnit = (s, unit) => COUNT_UNITS.has(unit) || s.settings.customUnits.some((u) => u.name === unit && u.count);
 
   /** Amount to suggest when adding an item: its default, else 1 for countable units, else null. */
-  const suggestedQty = (item) => (item.defaultQty > 0 ? item.defaultQty : isCountUnit(item.unit) ? 1 : null);
+  const suggestedQty = (s, item) => (item.defaultQty > 0 ? item.defaultQty : isCountUnit(s, item.unit) ? 1 : null);
 
   // ---------- Cupboard ----------
 
@@ -166,7 +278,7 @@
   /** Amount to actually buy: whole numbers for countable units. */
   function buyQty(s, e) {
     const item = itemById(s, e.itemId);
-    return item && isCountUnit(item.unit) ? Math.ceil(e.qty - EPS) : round(e.qty);
+    return item && isCountUnit(s, item.unit) ? Math.ceil(e.qty - EPS) : round(e.qty);
   }
 
   /** Take back an amount reserved for a meal from the unticked list entry. Returns how much was taken back. */
@@ -397,7 +509,7 @@
     const items = Object.keys(s.cupboard)
       .map((id) => itemById(s, id))
       .filter(Boolean)
-      .sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) || a.name.localeCompare(b.name));
+      .sort((a, b) => categoriesFor(s).indexOf(a.category) - categoriesFor(s).indexOf(b.category) || a.name.localeCompare(b.name));
     let reviewed = 0;
     let removed = 0;
     for (let i = 0; i < items.length; i++) {
@@ -466,7 +578,7 @@
   //
   // For sharing, state is stored as one small document per entity so that two
   // people editing different things never overwrite each other. Paths:
-  //   items/{id}  recipes/{id}  shopping/{id}  cupboard/{itemId}  meals/{id}  meta/week
+  //   items/{id}  recipes/{id}  shopping/{id}  cupboard/{itemId}  meals/{id}  meta/week  meta/settings
 
   const SYNC_COLLECTIONS = ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
 
@@ -487,6 +599,7 @@
     for (const [id, qty] of Object.entries(s.cupboard)) d.set(`cupboard/${id}`, { qty });
     s.week.meals.forEach((m, n) => d.set(`meals/${m.id}`, { ...clone(m), at: m.at || n }));
     d.set('meta/week', { id: s.week.id, start: s.week.start, lastWeek: s.lastWeek ? clone(s.lastWeek) : null });
+    d.set('meta/settings', clone(s.settings));
     return d;
   }
 
@@ -503,8 +616,10 @@
       if (!data || !id) continue;
       if (coll === 'items') {
         s.items.push({
-          id, name: String(data.name || ''), unit: UNITS.includes(data.unit) ? data.unit : 'each',
-          category: CATEGORIES.includes(data.category) ? data.category : 'Other',
+          // Lenient: a custom unit/category can arrive a moment before the settings doc.
+          id, name: String(data.name || ''),
+          unit: typeof data.unit === 'string' && data.unit ? data.unit : 'each',
+          category: typeof data.category === 'string' && data.category ? data.category : FALLBACK_CATEGORY,
           frequent: !!data.frequent, shortLife: !!data.shortLife, multiUse: !!data.multiUse,
           defaultQty: cleanDefault(data.defaultQty),
           frequentBuy: !!data.frequentBuy,
@@ -529,6 +644,8 @@
         });
       } else if (coll === 'meta' && id === 'week') {
         meta = data;
+      } else if (coll === 'meta' && id === 'settings') {
+        s.settings = cleanSettings(data);
       }
     }
     s.week.meals.sort((a, b) => a.at - b.at);
@@ -559,7 +676,9 @@
   }
 
   const api = {
-    UNITS, CATEGORIES, EPS, MAX_INSTRUCTIONS, uid, round, today, emptyState, normalise, sampleState,
+    UNITS, CATEGORIES, FALLBACK_CATEGORY, MAX_UNIT_NAME, MAX_CATEGORY_NAME, EPS, MAX_INSTRUCTIONS, uid,
+    unitsFor, categoriesFor, addUnit, removeUnit, unitUsage,
+    addCategory, renameCategory, removeCategory, moveCategory, categoryUsage, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit, suggestedQty,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,

@@ -31,8 +31,10 @@ rules_version = '2';
 //   - joinCode: string (optional, 8 chars A–Z/2–9) - invite code presented by the last joiner
 //
 // Subcollections: households/{hid}/{collection}/{docId}, collection is one of:
-//   items/{id}:    id (== docId), name (1–100), unit (enum), category (enum),
+//   items/{id}:    id (== docId), name (1–100), unit (string 1–20), category (string 1–50),
 //                  frequent, shortLife, multiUse (bool); all required.
+//                  (Units and categories are household-editable, see meta/settings,
+//                  so they are length-checked rather than matched against a fixed list.)
 //                  Optional: defaultQty (number 0–1,000,000; 0 = none), frequentBuy (bool)
 //   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
 //                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty}),
@@ -45,6 +47,7 @@ rules_version = '2';
 //                  alloc (list ≤ 100 of {itemId, need, fromCupboard, toShop})
 //   meta/week:     id (string ≤ 64), start ('YYYY-MM-DD'),
 //                  lastWeek (null | {start, cooked, carried, dropped, binned}; lists ≤ 100)
+//   meta/settings: customUnits (list ≤ 50 of {name, count}), categories (list ≤ 50 of names)
 //
 // Collection: invites
 // Document ID: 8-char code from A–Z and 2–9 (random, ~40 bits)
@@ -55,8 +58,9 @@ rules_version = '2';
 //   - expiresAt: timestamp - in the future, at most 8 days ahead
 //
 // Known limitation: rules cannot loop over lists, so the *elements* of
-// recipes.ingredients, meals.alloc and lastWeek lists are size-capped but not
-// individually type-checked. Only household members can write them.
+// recipes.ingredients, meals.alloc, lastWeek lists and the settings lists are
+// size-capped but not individually type-checked. Only household members can
+// write them, and the app re-validates them when it reads them.
 // ===============================================================
 
 service cloud.firestore {
@@ -172,8 +176,8 @@ service cloud.firestore {
         && (!('frequentBuy' in d) || d.frequentBuy is bool)
         && d.id == docId
         && isShortString(d.name, 1, 100)
-        && d.unit in ['each', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice', 'pinch']
-        && d.category in ['Fruit & veg', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Cupboard', 'Herbs & spices', 'Frozen', 'Drinks', 'Household', 'Other']
+        && isShortString(d.unit, 1, 20)
+        && isShortString(d.category, 1, 50)
         && d.frequent is bool && d.shortLife is bool && d.multiUse is bool;
     }
 
@@ -229,6 +233,13 @@ service cloud.firestore {
         && isValidLastWeek(d.lastWeek);
     }
 
+    function isValidSettings(d) {
+      return hasExactFields(d, ['customUnits', 'categories'])
+        && isValidList(d.customUnits, 50)
+        && isValidList(d.categories, 50)
+        && d.categories.size() >= 1;
+    }
+
     function isHouseholdCollection(collection) {
       return collection in ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
     }
@@ -239,7 +250,8 @@ service cloud.firestore {
         || (collection == 'shopping' && isValidShoppingEntry(docId, d))
         || (collection == 'cupboard' && isValidCupboardEntry(d))
         || (collection == 'meals' && isValidMeal(docId, d))
-        || (collection == 'meta' && docId == 'week' && isValidWeekMeta(d));
+        || (collection == 'meta' && docId == 'week' && isValidWeekMeta(d))
+        || (collection == 'meta' && docId == 'settings' && isValidSettings(d));
     }
 
     // A member removes only themselves (and their display name); nothing else changes.

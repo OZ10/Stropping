@@ -154,7 +154,8 @@
 
   // ---------- Formatting ----------
 
-  const PLURAL = { clove: 'cloves', tin: 'tins', jar: 'jars', pack: 'packs', bottle: 'bottles', bunch: 'bunches', slice: 'slices', pinch: 'pinches' };
+  // Built-in units that take a plural. Custom units are shown exactly as the household typed them.
+  const PLURAL = { pint: 'pints', clove: 'cloves', tin: 'tins', jar: 'jars', pack: 'packs', bottle: 'bottles', bunch: 'bunches', slice: 'slices', pinch: 'pinches' };
   const num = (n) => String(L.round(n));
   function fmtQty(n, unit) {
     const v = num(n);
@@ -192,11 +193,17 @@
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat).push(row);
     }
-    return L.CATEGORIES.filter((c) => groups.has(c)).map((c) => [c, groups.get(c).sort((a, b) => a.item.name.localeCompare(b.item.name))]);
+    // Household's category order; anything unknown (e.g. mid-sync) goes at the end.
+    const order = L.categoriesFor(state);
+    const cats = [...order.filter((c) => groups.has(c)), ...[...groups.keys()].filter((c) => !order.includes(c)).sort()];
+    return cats.map((c) => [c, groups.get(c).sort((a, b) => a.item.name.localeCompare(b.item.name))]);
   }
 
-  const unitOptions = (sel) => L.UNITS.map((u) => `<option value="${u}"${u === sel ? ' selected' : ''}>${u}</option>`).join('');
-  const catOptions = (sel) => L.CATEGORIES.map((c) => `<option${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const withCurrent = (list, sel) => (sel && !list.includes(sel) ? [...list, sel] : list);
+  const unitOptions = (sel) => withCurrent(L.unitsFor(state), sel)
+    .map((u) => `<option value="${esc(u)}"${u === sel ? ' selected' : ''}>${esc(u)}</option>`).join('');
+  const catOptions = (sel) => withCurrent(L.categoriesFor(state), sel)
+    .map((c) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
   const itemsDatalist = () => `<datalist id="items-dl">${state.items.map((i) => `<option value="${esc(i.name)}">`).join('')}</datalist>`;
 
   function empty(text, extra = '') {
@@ -346,7 +353,10 @@
     return `
       <div class="head">
         <div><h2>Items</h2><p class="sub">Ingredients and household items</p></div>
-        <button class="btn primary" data-act="new-item">+ New item</button>
+        <div class="row-btns">
+          <button class="btn" data-act="lists">Units &amp; categories</button>
+          <button class="btn primary" data-act="new-item">+ New item</button>
+        </div>
       </div>
       ${rows.length ? `<input type="search" class="search" data-filter placeholder="Search items" aria-label="Search items" value="${esc(itemFilter)}">` : ''}
       ${rows.length ? byCategory(rows).map(([cat, list]) => `
@@ -861,6 +871,120 @@
     });
   }
 
+  // ---------- Units & categories (#39, #42) ----------
+
+  function listsHtml() {
+    const cats = L.categoriesFor(state);
+    const catRows = cats.map((c, n) => {
+      const fixed = c === L.FALLBACK_CATEGORY;
+      return `<li data-cat="${esc(c)}">
+        <span class="grow"><span class="title">${esc(c)}</span><span class="sub">${plural(L.categoryUsage(state, c).length, 'item')}${fixed ? ' · always kept' : ''}</span></span>
+        <button type="button" class="icon-btn" data-cat-act="up"${n === 0 ? ' disabled' : ''} aria-label="Move ${esc(c)} up">↑</button>
+        <button type="button" class="icon-btn" data-cat-act="down"${n === cats.length - 1 ? ' disabled' : ''} aria-label="Move ${esc(c)} down">↓</button>
+        ${fixed ? '<span class="icon-spacer"></span><span class="icon-spacer"></span>'
+          : `<button type="button" class="icon-btn" data-cat-act="rename" aria-label="Rename ${esc(c)}">✎</button>
+             <button type="button" class="icon-btn" data-cat-act="delete" aria-label="Delete ${esc(c)}">${ICON.x}</button>`}
+      </li>`;
+    }).join('');
+    const custom = state.settings.customUnits;
+    const unitRows = custom.map((u) => `<li data-unit="${esc(u.name)}">
+        <span class="grow"><span class="title">${esc(u.name)}</span><span class="sub">${u.count ? 'Whole numbers' : 'Measured'} · ${plural(L.unitUsage(state, u.name).length, 'item')}</span></span>
+        <button type="button" class="icon-btn" data-unit-act="delete" aria-label="Delete ${esc(u.name)}">${ICON.x}</button>
+      </li>`).join('');
+    return `
+      <section class="settings-block">
+        <h3>Categories</h3>
+        <p class="hint">The shopping list and cupboard are grouped in this order.</p>
+        <ul class="rows edit-list">${catRows}</ul>
+        <div class="add-row">
+          <input data-new-cat maxlength="${L.MAX_CATEGORY_NAME}" placeholder="New category" aria-label="New category name" autocomplete="off">
+          <button type="button" class="btn" data-add-cat>Add</button>
+        </div>
+      </section>
+      <section class="settings-block">
+        <h3>Units</h3>
+        <p class="hint">Built in: ${esc(L.UNITS.join(', '))}.</p>
+        ${custom.length ? `<ul class="rows edit-list">${unitRows}</ul>` : ''}
+        <div class="add-row">
+          <input data-new-unit maxlength="${L.MAX_UNIT_NAME}" placeholder="New unit, e.g. punnet" aria-label="New unit name" autocomplete="off">
+          <button type="button" class="btn" data-add-unit>Add</button>
+        </div>
+        <label class="check-line"><input type="checkbox" data-new-unit-count>
+          <span>Bought in whole numbers, like tins or packs. The shopping list rounds these up.</span></label>
+      </section>
+      <div class="sheet-actions"><button type="button" class="btn primary" data-close>Done</button></div>`;
+  }
+
+  function listsSheet() {
+    openSheet({
+      title: 'Units & categories',
+      autofocus: false,
+      html: `<div class="lists" data-lists>${listsHtml()}</div>`,
+      onSubmit: () => false, // pressing Enter in a box shouldn't close the sheet
+      onMount: (d) => {
+        const box = $('[data-lists]', d);
+        const refresh = () => { box.innerHTML = listsHtml(); };
+        const attempt = async (fn) => {
+          try {
+            if ((await fn()) === false) return;
+            commit();
+            refresh();
+          } catch (err) {
+            await ask({ title: 'Can’t do that', text: err.message, buttons: [{ label: 'OK', value: true, style: 'primary' }] });
+          }
+        };
+        const addCat = () => attempt(() => {
+          const input = $('[data-new-cat]', box);
+          L.addCategory(state, input.value);
+        });
+        const addUnit = () => attempt(() => {
+          L.addUnit(state, $('[data-new-unit]', box).value, $('[data-new-unit-count]', box).checked);
+        });
+        box.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter') return;
+          if (e.target.matches('[data-new-cat]')) { e.preventDefault(); addCat(); }
+          if (e.target.matches('[data-new-unit]')) { e.preventDefault(); addUnit(); }
+        });
+        box.addEventListener('click', (e) => {
+          if (e.target.closest('[data-add-cat]')) return addCat();
+          if (e.target.closest('[data-add-unit]')) return addUnit();
+          const catBtn = e.target.closest('[data-cat-act]');
+          if (catBtn) {
+            const name = catBtn.closest('[data-cat]').dataset.cat;
+            const act = catBtn.dataset.catAct;
+            if (act === 'up' || act === 'down') return attempt(() => L.moveCategory(state, name, act === 'up' ? -1 : 1));
+            if (act === 'rename') {
+              return attempt(async () => {
+                const res = await ask({
+                  title: `Rename ${name}`,
+                  input: { type: 'text', label: 'New name', value: name, maxlength: L.MAX_CATEGORY_NAME },
+                  buttons: [{ label: 'Cancel', value: null }, { label: 'Rename', value: 'ok', style: 'primary', needsInput: true }],
+                });
+                if (!res || res.input === name) return false;
+                L.renameCategory(state, name, res.input);
+              });
+            }
+            if (act === 'delete') {
+              return attempt(async () => {
+                const n = L.categoryUsage(state, name).length;
+                const ok = await confirm(`Delete ${name}?`,
+                  n ? `Its ${plural(n, 'item')} will move to “${L.FALLBACK_CATEGORY}”.${everyone()}` : `No items use it.${everyone()}`, 'Delete', 'danger');
+                if (!ok) return false;
+                L.removeCategory(state, name);
+              });
+            }
+          }
+          const unitBtn = e.target.closest('[data-unit-act]');
+          if (unitBtn) {
+            const name = unitBtn.closest('[data-unit]').dataset.unit;
+            return attempt(() => L.removeUnit(state, name));
+          }
+          return undefined;
+        });
+      },
+    });
+  }
+
   /** Item name field with "create new item" options, plus a quantity. */
   function pickerHtml(qtyLabel) {
     return `
@@ -883,7 +1007,7 @@
     const sync = () => {
       const item = L.findItemByName(state, form.item.value);
       if (!typedQty) {
-        const sq = item ? L.suggestedQty(item) : null;
+        const sq = item ? L.suggestedQty(state, item) : null;
         form.qty.value = sq == null ? '' : num(sq);
       }
       $('.new-fields', d).hidden = !(form.item.value.trim() && !item);
@@ -927,7 +1051,7 @@
     }
     const onList = new Set(state.shopping.filter((e) => !e.done).map((e) => e.itemId));
     return `<h3>Frequently bought</h3><div class="chips">${items.map((i) => {
-      const sq = L.suggestedQty(i);
+      const sq = L.suggestedQty(state, i);
       const amount = i.multiUse || sq == null ? '' : `<small>${esc(fmtQty(sq, i.unit))}</small>`;
       return onList.has(i.id)
         ? `<button type="button" class="chip is-on" disabled aria-label="${esc(i.name)} is on the list">✓ ${esc(i.name)}</button>`
@@ -938,7 +1062,7 @@
   async function quickAdd(itemId, d) {
     const item = L.itemById(state, itemId);
     if (!item) return;
-    let qty = item.multiUse ? 1 : L.suggestedQty(item);
+    let qty = item.multiUse ? 1 : L.suggestedQty(state, item);
     if (qty == null) {
       const res = await ask({
         title: `Add ${item.name} to the list`,
@@ -1258,6 +1382,7 @@
       toast('Shopping list cleared.');
     },
     'new-item': () => editItem(null),
+    lists: listsSheet,
     'edit-item': editItem,
     'item-to-list': async (id) => {
       const item = L.itemById(state, id);
@@ -1270,7 +1395,7 @@
       }
       const res = await ask({
         title: `Add ${item.name} to the list`,
-        input: { label: `Quantity (${item.unit})`, value: L.suggestedQty(item) == null ? '' : num(L.suggestedQty(item)) },
+        input: { label: `Quantity (${item.unit})`, value: L.suggestedQty(state, item) == null ? '' : num(L.suggestedQty(state, item)) },
         buttons: [{ label: 'Cancel', value: null }, { label: 'Add', value: 'add', style: 'primary', needsInput: true }],
       });
       if (!res || !(res.input > 0)) return;
