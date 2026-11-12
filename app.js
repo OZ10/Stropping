@@ -282,23 +282,89 @@
     </li>`;
   }
 
+  // ---------- Recipe labels (#45) ----------
+
+  /** Labels used by at least one recipe, in the household's order (plus any stray ones). */
+  function labelsInUse() {
+    const used = new Set(state.recipes.flatMap((r) => r.labels));
+    return [...state.labels.filter((l) => used.has(l)), ...[...used].filter((l) => !state.labels.includes(l)).sort()];
+  }
+
+  /** Toggle buttons for filtering recipes by label. */
+  function labelFilterHtml(selected) {
+    const labels = labelsInUse();
+    if (!labels.length) return '';
+    return `<div class="chips filter" role="group" aria-label="Filter recipes by label">
+      ${labels.map((l) => `<button type="button" class="chip" data-act="filter-label" data-label="${esc(l)}" aria-pressed="${selected.includes(l)}">${esc(l)}</button>`).join('')}
+      ${selected.length ? '<button type="button" class="chip clear" data-act="filter-clear">Clear</button>' : ''}
+    </div>`;
+  }
+
+  const labelTags = (labels) => (labels.length
+    ? `<span class="tags">${labels.map((l) => `<span class="tag">${esc(l)}</span>`).join('')}</span>` : '');
+
+  const toggleIn = (list, value) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+
+  // The Recipes tab filter is remembered on this device only.
+  const FILTER_KEY = 'stropping:recipeFilter';
+  let recipeFilter = [];
+  try { recipeFilter = JSON.parse(localStorage.getItem(FILTER_KEY)) || []; } catch (e) { recipeFilter = []; }
+  function setRecipeFilter(next) {
+    recipeFilter = next;
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify(next)); } catch (e) { /* ignore */ }
+    render();
+  }
+
+  function labelsSheet() {
+    const html = () => `<section class="settings-block">
+        <p class="hint">Tag recipes so you can filter them, for example by Fast or Air Fryer.</p>
+        ${orderedListHtml(LABEL_LIST, 'New label')}
+      </section>
+      <div class="sheet-actions"><button type="button" class="btn primary" data-close>Done</button></div>`;
+    openSheet({
+      title: 'Recipe labels',
+      autofocus: false,
+      html: `<div class="lists" data-lists>${html()}</div>`,
+      onSubmit: () => false,
+      onMount: (d) => {
+        const box = $('[data-lists]', d);
+        const refresh = () => { box.innerHTML = html(); };
+        box.addEventListener('keydown', (e) => handleOrderedListEvent(e, box, [LABEL_LIST], refresh));
+        box.addEventListener('click', (e) => handleOrderedListEvent(e, box, [LABEL_LIST], refresh));
+      },
+    });
+  }
+
   function renderRecipes() {
     const planned = new Set(state.week.meals.map((m) => m.recipeId));
-    const list = [...state.recipes].sort((a, b) => a.name.localeCompare(b.name));
-    return `
-      <div class="head">
-        <div><h2>Recipes</h2><p class="sub">${plural(list.length, 'recipe')}</p></div>
-        <button class="btn primary" data-act="new-recipe">+ New recipe</button>
-      </div>
-      ${list.length ? `<ul class="cards">${list.map((r) => `
+    // Drop filters for labels no recipe uses any more (renamed or deleted).
+    const active = recipeFilter.filter((l) => labelsInUse().includes(l));
+    const list = L.recipesWithLabels(state, active).sort((a, b) => a.name.localeCompare(b.name));
+    const total = state.recipes.length;
+    let body;
+    if (!total) body = empty('No recipes yet. Add a name, a link and the ingredients for the number of portions it makes.');
+    else if (!list.length) body = empty('No recipes have all of these labels.', '<button class="btn" data-act="filter-clear">Clear filter</button>');
+    else {
+      body = `<ul class="cards">${list.map((r) => `
         <li><button class="card recipe" data-act="view-recipe" data-id="${r.id}">
           <span class="grow">
             <span class="title">${esc(r.name)}</span>
             <span class="sub">Serves ${r.serves} · ${plural(r.ingredients.length, 'ingredient')}${host(r.url) ? ` · ${esc(host(r.url))}` : ''}</span>
+            ${labelTags(r.labels)}
           </span>
           ${planned.has(r.id) ? '<span class="badge plan">This week</span>' : ''}
-        </button></li>`).join('')}</ul>`
-        : empty('No recipes yet. Add a name, a link and the ingredients for the number of portions it makes.')}`;
+        </button></li>`).join('')}</ul>`;
+    }
+    return `
+      <div class="head">
+        <div><h2>Recipes</h2><p class="sub">${active.length ? `${list.length} of ${plural(total, 'recipe')}` : plural(total, 'recipe')}</p></div>
+        <div class="row-btns">
+          <button class="btn" data-act="labels">Labels</button>
+          <button class="btn primary" data-act="new-recipe">+ New recipe</button>
+        </div>
+      </div>
+      ${labelFilterHtml(active)}
+      ${body}`;
   }
 
   function renderCupboard() {
@@ -623,18 +689,38 @@
 
   function addMealSheet(recipeId) {
     if (!state.recipes.length) { toast('Add a recipe first.'); go('recipes'); return; }
-    const recipes = [...state.recipes].sort((a, b) => a.name.localeCompare(b.name));
-    const sel = recipes.find((r) => r.id === recipeId) || recipes[0];
+    let picked = []; // label filter for this sheet only
+    const matching = () => L.recipesWithLabels(state, picked).sort((a, b) => a.name.localeCompare(b.name));
+    const options = (list, selId) => list.map((r) => `<option value="${r.id}"${r.id === selId ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
+    const first = matching();
+    const sel = first.find((r) => r.id === recipeId) || first[0];
     openSheet({
       title: 'Add a meal to this week',
       html: `
-        <label class="field"><span>Recipe</span><select name="recipe">${recipes.map((r) => `<option value="${r.id}"${r === sel ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+        <div data-meal-filter>${labelFilterHtml(picked)}</div>
+        <label class="field"><span>Recipe</span><select name="recipe">${options(first, sel.id)}</select></label>
+        <p class="hint" data-no-match hidden>No recipes have all of these labels.</p>
         <label class="field"><span>Portions</span><input name="portions" type="number" min="1" step="1" inputmode="numeric" required value="${sel.serves}"></label>
-        <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Add to week</button></div>`,
+        <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" data-submit>Add to week</button></div>`,
       onMount: (d, form) => {
-        form.recipe.addEventListener('change', () => {
+        const setPortions = () => {
           const r = state.recipes.find((x) => x.id === form.recipe.value);
           if (r) form.portions.value = r.serves;
+        };
+        form.recipe.addEventListener('change', setPortions);
+        const filterBox = $('[data-meal-filter]', d);
+        filterBox.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-act]');
+          if (!b) return;
+          picked = b.dataset.act === 'filter-clear' ? [] : toggleIn(picked, b.dataset.label);
+          filterBox.innerHTML = labelFilterHtml(picked);
+          const list = matching();
+          const keep = list.some((r) => r.id === form.recipe.value) ? form.recipe.value : list[0] && list[0].id;
+          form.recipe.innerHTML = options(list, keep);
+          $('[data-no-match]', d).hidden = list.length > 0;
+          form.recipe.disabled = !list.length;
+          $('[data-submit]', d).disabled = !list.length;
+          setPortions();
         });
       },
       onSubmit: (form) => {
@@ -665,6 +751,7 @@
     openSheet({
       title: r.name,
       html: `
+        ${labelTags(r.labels)}
         ${url ? `<a class="ext" href="${esc(url)}" target="_blank" rel="noopener">${ICON.link}<span>Open recipe on ${esc(host(url))}</span></a>` : ''}
         <div class="stepper"><span>Portions</span>
           <button type="button" class="icon-btn" data-step="-1" aria-label="Fewer portions">−</button>
@@ -708,7 +795,9 @@
   </div>`;
 
   function editRecipe(id) {
-    const r = state.recipes.find((x) => x.id === id) || { name: '', url: '', serves: 4, ingredients: [], instructions: '' };
+    const r = state.recipes.find((x) => x.id === id) || { name: '', url: '', serves: 4, ingredients: [], instructions: '', labels: [] };
+    // Household labels, plus any this recipe has that were since removed from the list.
+    const pickable = [...state.labels, ...r.labels.filter((l) => !state.labels.includes(l))];
     const rows = r.ingredients.map((g) => {
       const item = L.itemById(state, g.itemId);
       return item ? ingRow(item.name, num(g.qty), item.unit) : '';
@@ -719,6 +808,10 @@
         <label class="field"><span>Name</span><input name="name" required maxlength="200" value="${esc(r.name)}" autocomplete="off"></label>
         <label class="field"><span>Web link <em>optional</em></span><input name="url" type="text" inputmode="url" maxlength="2000" placeholder="https://…" value="${esc(r.url)}" autocomplete="off"></label>
         <label class="field narrow"><span>Serves</span><input name="serves" type="number" min="1" step="1" inputmode="numeric" required value="${r.serves}"></label>
+        <fieldset class="label-pick"><legend>Labels</legend>
+          ${pickable.length ? `<div class="chips" data-label-pick>${pickable.map((l) => `<button type="button" class="chip" data-label="${esc(l)}" aria-pressed="${r.labels.includes(l)}">${esc(l)}</button>`).join('')}</div>`
+            : '<p class="hint">No labels yet. Add some with the Labels button on the Recipes tab.</p>'}
+        </fieldset>
         <fieldset class="ings"><legend>Ingredients</legend>
           <div class="ing-rows">${rows}</div>
           <button type="button" class="btn small" data-add-row>+ Add ingredient</button>
@@ -737,6 +830,11 @@
           if (item) sel.value = item.unit;
         };
         $$('.ing-row', d).forEach(sync);
+        const picker = $('[data-label-pick]', d);
+        if (picker) picker.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-label]');
+          if (b) b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+        });
         const rowsEl = $('.ing-rows', d);
         rowsEl.addEventListener('input', (e) => {
           if (e.target.classList.contains('ing-name')) sync(e.target.closest('.ing-row'));
@@ -778,6 +876,7 @@
             qty: L.round(x.qty),
           })),
           instructions: form.instructions.value.replace(/\s+$/, '').slice(0, L.MAX_INSTRUCTIONS),
+          labels: $$('[data-label-pick] [aria-pressed="true"]', form).map((b) => b.dataset.label),
         };
         const existing = state.recipes.find((x) => x.id === id);
         if (existing) Object.assign(existing, data);
@@ -871,21 +970,118 @@
     });
   }
 
+  // ---------- Editable ordered lists: categories (#39) and recipe labels (#45) ----------
+
+  const CATEGORY_LIST = {
+    key: 'categories',
+    noun: 'category',
+    maxLen: L.MAX_CATEGORY_NAME,
+    names: () => L.categoriesFor(state),
+    fixed: L.FALLBACK_CATEGORY,
+    usage: (n) => plural(L.categoryUsage(state, n).length, 'item'),
+    add: (n) => L.addCategory(state, n),
+    move: (n, delta) => L.moveCategory(state, n, delta),
+    rename: (from, to) => L.renameCategory(state, from, to),
+    remove: (n) => L.removeCategory(state, n),
+    removeText: (n) => {
+      const k = L.categoryUsage(state, n).length;
+      return k ? `Its ${plural(k, 'item')} will move to “${L.FALLBACK_CATEGORY}”.` : 'No items use it.';
+    },
+  };
+
+  const LABEL_LIST = {
+    key: 'labels',
+    noun: 'label',
+    maxLen: L.MAX_LABEL_NAME,
+    names: () => state.labels,
+    fixed: null,
+    usage: (n) => plural(L.labelUsage(state, n).length, 'recipe'),
+    add: (n) => L.addLabel(state, n),
+    move: (n, delta) => L.moveLabel(state, n, delta),
+    rename: (from, to) => L.renameLabel(state, from, to),
+    remove: (n) => L.removeLabel(state, n),
+    removeText: (n) => {
+      const k = L.labelUsage(state, n).length;
+      return k ? `It will be taken off ${plural(k, 'recipe')}.` : 'No recipes use it.';
+    },
+  };
+
+  /** Rows plus an "add" box for one editable list. */
+  function orderedListHtml(list, placeholder) {
+    const names = list.names();
+    const rows = names.map((name, n) => {
+      const fixed = name === list.fixed;
+      return `<li data-entry="${esc(name)}">
+        <span class="grow"><span class="title">${esc(name)}</span><span class="sub">${list.usage(name)}${fixed ? ' · always kept' : ''}</span></span>
+        <button type="button" class="icon-btn" data-entry-act="up"${n === 0 ? ' disabled' : ''} aria-label="Move ${esc(name)} up">↑</button>
+        <button type="button" class="icon-btn" data-entry-act="down"${n === names.length - 1 ? ' disabled' : ''} aria-label="Move ${esc(name)} down">↓</button>
+        ${fixed ? '<span class="icon-spacer"></span><span class="icon-spacer"></span>'
+          : `<button type="button" class="icon-btn" data-entry-act="rename" aria-label="Rename ${esc(name)}">✎</button>
+             <button type="button" class="icon-btn" data-entry-act="delete" aria-label="Delete ${esc(name)}">${ICON.x}</button>`}
+      </li>`;
+    }).join('');
+    return `${names.length ? `<ul class="rows edit-list" data-list="${list.key}">${rows}</ul>` : ''}
+      <div class="add-row" data-list="${list.key}">
+        <input data-new-entry maxlength="${list.maxLen}" placeholder="${esc(placeholder)}" aria-label="New ${list.noun} name" autocomplete="off">
+        <button type="button" class="btn" data-add-entry>Add</button>
+      </div>`;
+  }
+
+  /** Commit after a successful edit; show the reason if it was refused. Return false from fn to cancel quietly. */
+  async function attemptEdit(fn, refresh) {
+    try {
+      if ((await fn()) === false) return;
+      commit();
+      refresh();
+    } catch (err) {
+      await ask({ title: 'Can’t do that', text: err.message, buttons: [{ label: 'OK', value: true, style: 'primary' }] });
+    }
+  }
+
+  /**
+   * Wire up add / move / rename / delete for any ordered lists inside `box`.
+   * Returns true if the event was handled.
+   */
+  function handleOrderedListEvent(e, box, lists, refresh) {
+    const holder = e.target.closest('[data-list]');
+    const list = holder && lists.find((l) => l.key === holder.dataset.list);
+    if (!list) return false;
+    const add = () => attemptEdit(() => list.add($('[data-new-entry]', holder).value), refresh);
+    if (e.type === 'keydown') {
+      if (e.key !== 'Enter' || !e.target.matches('[data-new-entry]')) return false;
+      e.preventDefault();
+      add();
+      return true;
+    }
+    if (e.target.closest('[data-add-entry]')) { add(); return true; }
+    const btn = e.target.closest('[data-entry-act]');
+    if (!btn) return false;
+    const name = btn.closest('[data-entry]').dataset.entry;
+    const act = btn.dataset.entryAct;
+    if (act === 'up' || act === 'down') attemptEdit(() => list.move(name, act === 'up' ? -1 : 1), refresh);
+    if (act === 'rename') {
+      attemptEdit(async () => {
+        const res = await ask({
+          title: `Rename ${name}`,
+          input: { type: 'text', label: 'New name', value: name, maxlength: list.maxLen },
+          buttons: [{ label: 'Cancel', value: null }, { label: 'Rename', value: 'ok', style: 'primary', needsInput: true }],
+        });
+        if (!res || res.input === name) return false;
+        return list.rename(name, res.input);
+      }, refresh);
+    }
+    if (act === 'delete') {
+      attemptEdit(async () => {
+        if (!(await confirm(`Delete ${name}?`, `${list.removeText(name)}${everyone()}`, 'Delete', 'danger'))) return false;
+        return list.remove(name);
+      }, refresh);
+    }
+    return true;
+  }
+
   // ---------- Units & categories (#39, #42) ----------
 
   function listsHtml() {
-    const cats = L.categoriesFor(state);
-    const catRows = cats.map((c, n) => {
-      const fixed = c === L.FALLBACK_CATEGORY;
-      return `<li data-cat="${esc(c)}">
-        <span class="grow"><span class="title">${esc(c)}</span><span class="sub">${plural(L.categoryUsage(state, c).length, 'item')}${fixed ? ' · always kept' : ''}</span></span>
-        <button type="button" class="icon-btn" data-cat-act="up"${n === 0 ? ' disabled' : ''} aria-label="Move ${esc(c)} up">↑</button>
-        <button type="button" class="icon-btn" data-cat-act="down"${n === cats.length - 1 ? ' disabled' : ''} aria-label="Move ${esc(c)} down">↓</button>
-        ${fixed ? '<span class="icon-spacer"></span><span class="icon-spacer"></span>'
-          : `<button type="button" class="icon-btn" data-cat-act="rename" aria-label="Rename ${esc(c)}">✎</button>
-             <button type="button" class="icon-btn" data-cat-act="delete" aria-label="Delete ${esc(c)}">${ICON.x}</button>`}
-      </li>`;
-    }).join('');
     const custom = state.settings.customUnits;
     const unitRows = custom.map((u) => `<li data-unit="${esc(u.name)}">
         <span class="grow"><span class="title">${esc(u.name)}</span><span class="sub">${u.count ? 'Whole numbers' : 'Measured'} · ${plural(L.unitUsage(state, u.name).length, 'item')}</span></span>
@@ -895,11 +1091,7 @@
       <section class="settings-block">
         <h3>Categories</h3>
         <p class="hint">The shopping list and cupboard are grouped in this order.</p>
-        <ul class="rows edit-list">${catRows}</ul>
-        <div class="add-row">
-          <input data-new-cat maxlength="${L.MAX_CATEGORY_NAME}" placeholder="New category" aria-label="New category name" autocomplete="off">
-          <button type="button" class="btn" data-add-cat>Add</button>
-        </div>
+        ${orderedListHtml(CATEGORY_LIST, 'New category')}
       </section>
       <section class="settings-block">
         <h3>Units</h3>
@@ -924,62 +1116,18 @@
       onMount: (d) => {
         const box = $('[data-lists]', d);
         const refresh = () => { box.innerHTML = listsHtml(); };
-        const attempt = async (fn) => {
-          try {
-            if ((await fn()) === false) return;
-            commit();
-            refresh();
-          } catch (err) {
-            await ask({ title: 'Can’t do that', text: err.message, buttons: [{ label: 'OK', value: true, style: 'primary' }] });
-          }
-        };
-        const addCat = () => attempt(() => {
-          const input = $('[data-new-cat]', box);
-          L.addCategory(state, input.value);
-        });
-        const addUnit = () => attempt(() => {
+        const addUnit = () => attemptEdit(() => {
           L.addUnit(state, $('[data-new-unit]', box).value, $('[data-new-unit-count]', box).checked);
-        });
+        }, refresh);
         box.addEventListener('keydown', (e) => {
-          if (e.key !== 'Enter') return;
-          if (e.target.matches('[data-new-cat]')) { e.preventDefault(); addCat(); }
-          if (e.target.matches('[data-new-unit]')) { e.preventDefault(); addUnit(); }
+          if (handleOrderedListEvent(e, box, [CATEGORY_LIST], refresh)) return;
+          if (e.key === 'Enter' && e.target.matches('[data-new-unit]')) { e.preventDefault(); addUnit(); }
         });
         box.addEventListener('click', (e) => {
-          if (e.target.closest('[data-add-cat]')) return addCat();
-          if (e.target.closest('[data-add-unit]')) return addUnit();
-          const catBtn = e.target.closest('[data-cat-act]');
-          if (catBtn) {
-            const name = catBtn.closest('[data-cat]').dataset.cat;
-            const act = catBtn.dataset.catAct;
-            if (act === 'up' || act === 'down') return attempt(() => L.moveCategory(state, name, act === 'up' ? -1 : 1));
-            if (act === 'rename') {
-              return attempt(async () => {
-                const res = await ask({
-                  title: `Rename ${name}`,
-                  input: { type: 'text', label: 'New name', value: name, maxlength: L.MAX_CATEGORY_NAME },
-                  buttons: [{ label: 'Cancel', value: null }, { label: 'Rename', value: 'ok', style: 'primary', needsInput: true }],
-                });
-                if (!res || res.input === name) return false;
-                L.renameCategory(state, name, res.input);
-              });
-            }
-            if (act === 'delete') {
-              return attempt(async () => {
-                const n = L.categoryUsage(state, name).length;
-                const ok = await confirm(`Delete ${name}?`,
-                  n ? `Its ${plural(n, 'item')} will move to “${L.FALLBACK_CATEGORY}”.${everyone()}` : `No items use it.${everyone()}`, 'Delete', 'danger');
-                if (!ok) return false;
-                L.removeCategory(state, name);
-              });
-            }
-          }
+          if (handleOrderedListEvent(e, box, [CATEGORY_LIST], refresh)) return;
+          if (e.target.closest('[data-add-unit]')) { addUnit(); return; }
           const unitBtn = e.target.closest('[data-unit-act]');
-          if (unitBtn) {
-            const name = unitBtn.closest('[data-unit]').dataset.unit;
-            return attempt(() => L.removeUnit(state, name));
-          }
-          return undefined;
+          if (unitBtn) attemptEdit(() => L.removeUnit(state, unitBtn.closest('[data-unit]').dataset.unit), refresh);
         });
       },
     });
@@ -1383,6 +1531,9 @@
     },
     'new-item': () => editItem(null),
     lists: listsSheet,
+    labels: labelsSheet,
+    'filter-label': (_, el) => setRecipeFilter(toggleIn(recipeFilter.filter((l) => labelsInUse().includes(l)), el.dataset.label)),
+    'filter-clear': () => setRecipeFilter([]),
     'edit-item': editItem,
     'item-to-list': async (id) => {
       const item = L.itemById(state, id);

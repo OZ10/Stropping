@@ -38,7 +38,7 @@ rules_version = '2';
 //                  Optional: defaultQty (number 0–1,000,000; 0 = none), frequentBuy (bool)
 //   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
 //                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty}),
-//                  instructions (optional string ≤ 20,000)
+//                  instructions (optional string ≤ 20,000), labels (optional list ≤ 20 of names)
 //   shopping/{id}: id (== docId), itemId (string ≤ 64), qty, reserved, added
 //                  (number 0–1,000,000), done (bool)
 //   cupboard/{itemId}: qty (number 0–1,000,000)
@@ -48,6 +48,7 @@ rules_version = '2';
 //   meta/week:     id (string ≤ 64), start ('YYYY-MM-DD'),
 //                  lastWeek (null | {start, cooked, carried, dropped, binned}; lists ≤ 100)
 //   meta/settings: customUnits (list ≤ 50 of {name, count}), categories (list ≤ 50 of names)
+//   meta/labels:   labels (list ≤ 50 of recipe label names)
 //
 // Collection: invites
 // Document ID: 8-char code from A–Z and 2–9 (random, ~40 bits)
@@ -58,7 +59,7 @@ rules_version = '2';
 //   - expiresAt: timestamp - in the future, at most 8 days ahead
 //
 // Known limitation: rules cannot loop over lists, so the *elements* of
-// recipes.ingredients, meals.alloc, lastWeek lists and the settings lists are
+// recipes.ingredients, recipes.labels, meals.alloc, lastWeek, settings and label lists are
 // size-capped but not individually type-checked. Only household members can
 // write them, and the app re-validates them when it reads them.
 // ===============================================================
@@ -183,7 +184,8 @@ service cloud.firestore {
 
     function isValidRecipe(docId, d) {
       return d.keys().hasAll(['id', 'name', 'url', 'serves', 'ingredients'])
-        && d.keys().hasOnly(['id', 'name', 'url', 'serves', 'ingredients', 'instructions'])
+        && d.keys().hasOnly(['id', 'name', 'url', 'serves', 'ingredients', 'instructions', 'labels'])
+        && (!('labels' in d) || isValidList(d.labels, 20))
         && d.id == docId
         && isShortString(d.name, 1, 200)
         && isValidUrlOrEmpty(d.url)
@@ -240,6 +242,10 @@ service cloud.firestore {
         && d.categories.size() >= 1;
     }
 
+    function isValidLabels(d) {
+      return hasExactFields(d, ['labels']) && isValidList(d.labels, 50);
+    }
+
     function isHouseholdCollection(collection) {
       return collection in ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
     }
@@ -251,7 +257,8 @@ service cloud.firestore {
         || (collection == 'cupboard' && isValidCupboardEntry(d))
         || (collection == 'meals' && isValidMeal(docId, d))
         || (collection == 'meta' && docId == 'week' && isValidWeekMeta(d))
-        || (collection == 'meta' && docId == 'settings' && isValidSettings(d));
+        || (collection == 'meta' && docId == 'settings' && isValidSettings(d))
+        || (collection == 'meta' && docId == 'labels' && isValidLabels(d));
     }
 
     // A member removes only themselves (and their display name); nothing else changes.

@@ -8,7 +8,8 @@
  *
  * State shape:
  *   items:    [{ id, name, unit, category, frequent, shortLife, multiUse }]
- *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty }], instructions }]
+ *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty }], instructions, labels: [name] }]
+ *   labels:   [name]  household's recipe labels, in display order
  *   cupboard: { [itemId]: qty }            multi-use items: 1 = in stock
  *   shopping: [{ id, itemId, qty, reserved, done, added }]
  *             reserved = amount already promised to planned meals
@@ -33,6 +34,11 @@
   const MAX_CUSTOM = 50; // max custom units, and max categories (also in firestore.rules)
   const MAX_UNIT_NAME = 20;
   const MAX_CATEGORY_NAME = 50;
+  // Recipe labels (#45): household list (own sync doc, meta/labels) + per-recipe selection.
+  const DEFAULT_LABELS = ['Simple', 'Fast', 'From Freezer', 'Slow Cooker', 'Oven', 'Gas Hob', 'Air Fryer'];
+  const MAX_LABELS = 50; // household label list (also in firestore.rules)
+  const MAX_LABEL_NAME = 30;
+  const MAX_RECIPE_LABELS = 20; // labels on one recipe (also in firestore.rules)
   const EPS = 1e-6;
 
   const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
@@ -70,24 +76,34 @@
       })
       .slice(0, MAX_CUSTOM);
     if (Array.isArray(raw.categories)) {
-      const seen = new Set();
-      let cats = [];
-      for (const c of raw.categories) {
-        const n = String(c || '').trim().slice(0, MAX_CATEGORY_NAME);
-        if (n && !seen.has(n.toLowerCase())) {
-          seen.add(n.toLowerCase());
-          cats.push(n);
-        }
-      }
-      cats = cats.slice(0, MAX_CUSTOM);
-      if (!cats.includes(FALLBACK_CATEGORY)) cats = [...cats.slice(0, MAX_CUSTOM - 1), FALLBACK_CATEGORY];
-      out.categories = cats;
+      const cats = cleanNameList(raw.categories, MAX_CUSTOM, MAX_CATEGORY_NAME);
+      out.categories = cats.includes(FALLBACK_CATEGORY) ? cats : [...cats.slice(0, MAX_CUSTOM - 1), FALLBACK_CATEGORY];
     }
     return out;
   }
 
+  /** Trim, drop blanks, de-duplicate (ignoring case) and cap a list of names. */
+  function cleanNameList(list, maxItems, maxLen) {
+    const seen = new Set();
+    const out = [];
+    for (const v of Array.isArray(list) ? list : []) {
+      const n = String(v == null ? '' : v).trim().slice(0, maxLen);
+      if (n && !seen.has(n.toLowerCase())) {
+        seen.add(n.toLowerCase());
+        out.push(n);
+      }
+    }
+    return out.slice(0, maxItems);
+  }
+
+  const cleanLabels = (raw) => (Array.isArray(raw) ? cleanNameList(raw, MAX_LABELS, MAX_LABEL_NAME) : [...DEFAULT_LABELS]);
+  const cleanRecipeLabels = (raw) => cleanNameList(raw, MAX_RECIPE_LABELS, MAX_LABEL_NAME);
+
   function emptyState() {
-    return { version: 1, items: [], recipes: [], cupboard: {}, shopping: [], week: newWeek(), lastWeek: null, settings: defaultSettings() };
+    return {
+      version: 1, items: [], recipes: [], cupboard: {}, shopping: [], week: newWeek(), lastWeek: null,
+      settings: defaultSettings(), labels: [...DEFAULT_LABELS],
+    };
   }
 
   const unitsFor = (s) => [...UNITS, ...s.settings.customUnits.map((u) => u.name)];
@@ -113,13 +129,24 @@
     s.settings.customUnits = s.settings.customUnits.filter((u) => u.name !== name);
   }
 
-  function checkCategoryName(s, name, except) {
+  /** Validate a new name for an entry in an editable list (categories, labels). `except` is the entry being renamed. */
+  function checkListName(list, name, { noun, maxLen, except }) {
     const n = String(name || '').trim();
-    if (!n) throw new Error('Enter a name for the category.');
-    if (n.length > MAX_CATEGORY_NAME) throw new Error(`Category names can be up to ${MAX_CATEGORY_NAME} characters.`);
-    if (categoriesFor(s).some((c) => c !== except && sameName(c, n))) throw new Error(`There’s already a category called “${n}”.`);
+    if (!n) throw new Error(`Enter a name for the ${noun}.`);
+    if (n.length > maxLen) throw new Error(`${noun[0].toUpperCase()}${noun.slice(1)} names can be up to ${maxLen} characters.`);
+    if (list.some((c) => c !== except && sameName(c, n))) throw new Error(`There’s already a ${noun} called “${n}”.`);
     return n;
   }
+
+  /** Swap an entry with its neighbour (delta -1 = up, +1 = down). */
+  function moveInList(list, name, delta) {
+    const from = list.indexOf(name);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= list.length) return;
+    [list[from], list[to]] = [list[to], list[from]];
+  }
+
+  const checkCategoryName = (s, name, except) => checkListName(categoriesFor(s), name, { noun: 'category', maxLen: MAX_CATEGORY_NAME, except });
 
   /** New categories go just above "Other". */
   function addCategory(s, name) {
@@ -146,15 +173,40 @@
     for (const i of s.items) if (i.category === name) i.category = FALLBACK_CATEGORY;
   }
 
-  function moveCategory(s, name, delta) {
-    const list = s.settings.categories;
-    const from = list.indexOf(name);
-    const to = from + delta;
-    if (from < 0 || to < 0 || to >= list.length) return;
-    [list[from], list[to]] = [list[to], list[from]];
-  }
+  const moveCategory = (s, name, delta) => moveInList(s.settings.categories, name, delta);
 
   const categoryUsage = (s, name) => s.items.filter((i) => i.category === name);
+
+  // ---------- Recipe labels (#45) ----------
+
+  const checkLabelName = (s, name, except) => checkListName(s.labels, name, { noun: 'label', maxLen: MAX_LABEL_NAME, except });
+
+  function addLabel(s, name) {
+    const n = checkLabelName(s, name);
+    if (s.labels.length >= MAX_LABELS) throw new Error(`You can have up to ${MAX_LABELS} labels.`);
+    s.labels.push(n);
+    return n;
+  }
+
+  /** Rename a label everywhere, including on recipes. */
+  function renameLabel(s, from, to) {
+    const n = checkLabelName(s, to, from);
+    s.labels = s.labels.map((l) => (l === from ? n : l));
+    for (const r of s.recipes) r.labels = r.labels.map((l) => (l === from ? n : l));
+    return n;
+  }
+
+  /** Delete a label and take it off every recipe. */
+  function removeLabel(s, name) {
+    s.labels = s.labels.filter((l) => l !== name);
+    for (const r of s.recipes) r.labels = r.labels.filter((l) => l !== name);
+  }
+
+  const moveLabel = (s, name, delta) => moveInList(s.labels, name, delta);
+  const labelUsage = (s, name) => s.recipes.filter((r) => r.labels.includes(name));
+
+  /** Recipes that have ALL of the selected labels (all recipes when none are selected). */
+  const recipesWithLabels = (s, selected) => s.recipes.filter((r) => selected.every((l) => r.labels.includes(l)));
 
   /** Validate and fill defaults on loaded or imported data. Throws on junk. */
   function normalise(raw) {
@@ -163,6 +215,7 @@
     }
     const s = emptyState();
     s.settings = cleanSettings(raw.settings);
+    s.labels = cleanLabels(raw.labels);
     s.items = raw.items.filter((i) => i && i.id && i.name).map((i) => ({
       id: String(i.id),
       name: String(i.name),
@@ -184,6 +237,7 @@
         .filter((g) => g && ids.has(g.itemId))
         .map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
       instructions: cleanInstructions(r.instructions),
+      labels: cleanRecipeLabels(r.labels),
     }));
     for (const [id, q] of Object.entries(raw.cupboard || {})) {
       if (ids.has(id) && Number(q) > EPS) s.cupboard[id] = round(q);
@@ -555,14 +609,14 @@
       kitchenRoll: add('Kitchen roll', 'pack', 'Household', { frequentBuy: true }),
       bread: add('Bread', 'each', 'Bakery', { frequentBuy: true }),
     };
-    const recipe = (name, serves, list, instructions = '') => s.recipes.push({
-      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty]) => ({ itemId, qty })), instructions,
+    const recipe = (name, serves, labels, list, instructions = '') => s.recipes.push({
+      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty]) => ({ itemId, qty })), instructions, labels,
     });
-    recipe('Chicken curry', 4, [[i.chicken, 500], [i.onion, 1], [i.garlic, 3], [i.tomatoes, 1], [i.coconut, 1],
+    recipe('Chicken curry', 4, ['Gas Hob'], [[i.chicken, 500], [i.onion, 1], [i.garlic, 3], [i.tomatoes, 1], [i.coconut, 1],
       [i.cumin, 2], [i.paprika, 1], [i.oil, 1], [i.spinach, 100], [i.rice, 300]]);
-    recipe('Spaghetti bolognese', 4, [[i.mince, 500], [i.onion, 1], [i.garlic, 2], [i.tomatoes, 2], [i.pasta, 400],
+    recipe('Spaghetti bolognese', 4, ['Simple', 'Gas Hob'], [[i.mince, 500], [i.onion, 1], [i.garlic, 2], [i.tomatoes, 2], [i.pasta, 400],
       [i.oil, 1], [i.cheddar, 50]]);
-    recipe('Pancakes', 2, [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20]],
+    recipe('Pancakes', 2, ['Simple', 'Fast', 'Gas Hob'], [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20]],
       '1. Whisk the flour, eggs and milk into a smooth batter. Rest for 10 minutes.\n'
       + '2. Melt a little butter in a frying pan over a medium heat.\n'
       + '3. Pour in a thin layer of batter, cook for about a minute, flip and cook the other side.\n'
@@ -578,7 +632,8 @@
   //
   // For sharing, state is stored as one small document per entity so that two
   // people editing different things never overwrite each other. Paths:
-  //   items/{id}  recipes/{id}  shopping/{id}  cupboard/{itemId}  meals/{id}  meta/week  meta/settings
+  //   items/{id}  recipes/{id}  shopping/{id}  cupboard/{itemId}  meals/{id}
+  //   meta/week  meta/settings  meta/labels
 
   const SYNC_COLLECTIONS = ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
 
@@ -600,6 +655,8 @@
     s.week.meals.forEach((m, n) => d.set(`meals/${m.id}`, { ...clone(m), at: m.at || n }));
     d.set('meta/week', { id: s.week.id, start: s.week.start, lastWeek: s.lastWeek ? clone(s.lastWeek) : null });
     d.set('meta/settings', clone(s.settings));
+    // Separate from settings so an older app version saving settings can't drop the labels.
+    d.set('meta/labels', { labels: [...s.labels] });
     return d;
   }
 
@@ -629,6 +686,7 @@
           id, name: String(data.name || ''), url: data.url || '', serves: Number(data.serves) > 0 ? Number(data.serves) : 1,
           ingredients: (Array.isArray(data.ingredients) ? data.ingredients : []).map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
           instructions: cleanInstructions(data.instructions),
+          labels: cleanRecipeLabels(data.labels),
         });
       } else if (coll === 'shopping') {
         s.shopping.push({ id, itemId: data.itemId, qty: round(data.qty), reserved: round(data.reserved), done: !!data.done, added: round(data.added) });
@@ -646,6 +704,8 @@
         meta = data;
       } else if (coll === 'meta' && id === 'settings') {
         s.settings = cleanSettings(data);
+      } else if (coll === 'meta' && id === 'labels') {
+        s.labels = cleanLabels(data.labels);
       }
     }
     s.week.meals.sort((a, b) => a.at - b.at);
@@ -678,7 +738,8 @@
   const api = {
     UNITS, CATEGORIES, FALLBACK_CATEGORY, MAX_UNIT_NAME, MAX_CATEGORY_NAME, EPS, MAX_INSTRUCTIONS, uid,
     unitsFor, categoriesFor, addUnit, removeUnit, unitUsage,
-    addCategory, renameCategory, removeCategory, moveCategory, categoryUsage, round, today, emptyState, normalise, sampleState,
+    addCategory, renameCategory, removeCategory, moveCategory, categoryUsage,
+    DEFAULT_LABELS, MAX_LABEL_NAME, addLabel, renameLabel, removeLabel, moveLabel, labelUsage, recipesWithLabels, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit, suggestedQty,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,

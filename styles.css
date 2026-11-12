@@ -278,6 +278,18 @@ textarea {
 .chip:hover { border-color: var(--muted); }
 .chip small { color: var(--muted); font-weight: 500; }
 .chip.is-on { background: var(--accent-soft); border-color: transparent; color: var(--accent); cursor: default; }
+/* Toggle chips (label filters and the recipe editor's label picker) */
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.chip.clear { background: none; color: var(--muted); }
+.chips.filter { margin: -4px 0 14px; }
+.sheet-body .chips.filter { margin: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag {
+  padding: 1px 8px; border-radius: 999px; background: var(--surface-2);
+  color: var(--muted); font-size: .72rem; font-weight: 650; white-space: nowrap;
+}
+.sheet-body > .tags { margin-top: -6px; }
+.btn:disabled { opacity: .5; cursor: default; }
 .lists { display: grid; gap: 22px; }
 .settings-block { display: grid; gap: 10px; }
 .settings-block h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
