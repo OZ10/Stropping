@@ -61,6 +61,7 @@
       shortLife: !!i.shortLife,
       multiUse: !!i.multiUse,
       defaultQty: cleanDefault(i.defaultQty),
+      frequentBuy: !!i.frequentBuy,
     }));
     const ids = new Set(s.items.map((i) => i.id));
     s.recipes = raw.recipes.filter((r) => r && r.id && r.name).map((r) => ({
@@ -107,7 +108,7 @@
     return n ? s.items.find((i) => i.name.toLowerCase() === n) : undefined;
   };
 
-  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false, defaultQty = 0 }) {
+  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false, defaultQty = 0, frequentBuy = false }) {
     const existing = findItemByName(s, name);
     if (existing) return existing;
     const item = {
@@ -116,6 +117,7 @@
       category: CATEGORIES.includes(category) ? category : 'Other',
       frequent: !!frequent, shortLife: !!shortLife, multiUse: !!multiUse,
       defaultQty: cleanDefault(defaultQty),
+      frequentBuy: !!frequentBuy,
     };
     s.items.push(item);
     return item;
@@ -431,14 +433,15 @@
       rice: add('Basmati rice', 'g', 'Cupboard', { defaultQty: 500 }),
       pasta: add('Spaghetti', 'g', 'Cupboard', { defaultQty: 500 }),
       flour: add('Plain flour', 'g', 'Cupboard', { defaultQty: 1500 }),
-      milk: add('Milk', 'ml', 'Dairy & eggs', { frequent: true, defaultQty: 2272 }),
-      eggs: add('Eggs', 'each', 'Dairy & eggs', { frequent: true, defaultQty: 6 }),
-      butter: add('Butter', 'g', 'Dairy & eggs', { frequent: true, defaultQty: 250 }),
+      milk: add('Milk', 'ml', 'Dairy & eggs', { frequent: true, defaultQty: 2272, frequentBuy: true }),
+      eggs: add('Eggs', 'each', 'Dairy & eggs', { frequent: true, defaultQty: 6, frequentBuy: true }),
+      butter: add('Butter', 'g', 'Dairy & eggs', { frequent: true, defaultQty: 250, frequentBuy: true }),
       cheddar: add('Cheddar', 'g', 'Dairy & eggs', { defaultQty: 400 }),
       cumin: add('Ground cumin', 'tsp', 'Herbs & spices', { multiUse: true }),
       paprika: add('Paprika', 'tsp', 'Herbs & spices', { multiUse: true }),
       oil: add('Olive oil', 'tbsp', 'Cupboard', { multiUse: true }),
-      kitchenRoll: add('Kitchen roll', 'pack', 'Household'),
+      kitchenRoll: add('Kitchen roll', 'pack', 'Household', { frequentBuy: true }),
+      bread: add('Bread', 'each', 'Bakery', { frequentBuy: true }),
     };
     const recipe = (name, serves, list, instructions = '') => s.recipes.push({
       id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty]) => ({ itemId, qty })), instructions,
@@ -504,6 +507,7 @@
           category: CATEGORIES.includes(data.category) ? data.category : 'Other',
           frequent: !!data.frequent, shortLife: !!data.shortLife, multiUse: !!data.multiUse,
           defaultQty: cleanDefault(data.defaultQty),
+          frequentBuy: !!data.frequentBuy,
         });
       } else if (coll === 'recipes') {
         s.recipes.push({

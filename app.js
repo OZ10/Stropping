@@ -390,7 +390,7 @@
   }
 
   /** Open the form sheet. onSubmit(form) runs on submit; return false to keep it open. */
-  function openSheet({ title, html, onMount, onSubmit }) {
+  function openSheet({ title, html, onMount, onSubmit, autofocus = true }) {
     const d = $('#sheet');
     d.innerHTML = `<form class="sheet-inner">
       <header class="sheet-head"><h2 tabindex="-1" autofocus>${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="Close">${ICON.x}</button></header>
@@ -403,7 +403,7 @@
     });
     if (!d.open) d.showModal();
     if (onMount) onMount(d, form);
-    const first = $('input:not([type=hidden]):not([type=checkbox]), select', d);
+    const first = autofocus && $('input:not([type=hidden]):not([type=checkbox]), select', d);
     if (first && !first.value) first.focus();
   }
   const closeSheet = () => $('#sheet').close();
@@ -780,7 +780,7 @@
   }
 
   function editItem(id) {
-    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false, defaultQty: 0 };
+    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false, defaultQty: 0, frequentBuy: false };
     const flag = (name, title, desc) => `<label class="toggle"><input type="checkbox" name="${name}"${item[name] ? ' checked' : ''}>
       <span><strong>${title}</strong><small>${desc}</small></span></label>`;
     openSheet({
@@ -801,6 +801,9 @@
           ${flag('frequent', 'Frequently used', 'Also used outside recipes, like milk. Before it’s taken from the cupboard you’ll be asked whether it’s really still there.')}
           ${flag('shortLife', 'Short life', 'Goes off quickly, like chicken. If it isn’t used in a week, you’ll be asked to check it’s still in date.')}
           ${flag('multiUse', 'Multi-use', 'Lasts for many meals, like spices. Tracked as in stock or not, and you’ll always be asked whether you have it.')}
+        </fieldset>
+        <fieldset class="flags"><legend>Shopping</legend>
+          ${flag('frequentBuy', 'Frequently bought', 'Bought most weeks, like bread. Shown as a one-tap shortcut when you add things to the shopping list.')}
         </fieldset>
         ${id ? '<p class="hint">Changing the unit doesn’t convert amounts already in the cupboard or on the list.</p>' : ''}
         <div class="sheet-actions">
@@ -843,6 +846,7 @@
           name, unit: form.unit.value, category: form.category.value,
           frequent: form.frequent.checked, shortLife: form.shortLife.checked, multiUse: form.multiUse.checked,
           defaultQty: parseFloat(form.defaultQty.value) > 0 ? L.round(parseFloat(form.defaultQty.value)) : 0,
+          frequentBuy: form.frequentBuy.checked,
         };
         const existing = L.itemById(state, id);
         if (existing) {
@@ -915,11 +919,54 @@
     });
   }
 
+  /** One-tap buttons for items marked "Frequently bought". */
+  function quickPicksHtml() {
+    const items = state.items.filter((i) => i.frequentBuy).sort((a, b) => a.name.localeCompare(b.name));
+    if (!items.length) {
+      return '<p class="hint">Tip: tick <strong>Frequently bought</strong> on items you buy most weeks and they’ll appear here as shortcuts.</p>';
+    }
+    const onList = new Set(state.shopping.filter((e) => !e.done).map((e) => e.itemId));
+    return `<h3>Frequently bought</h3><div class="chips">${items.map((i) => {
+      const sq = L.suggestedQty(i);
+      const amount = i.multiUse || sq == null ? '' : `<small>${esc(fmtQty(sq, i.unit))}</small>`;
+      return onList.has(i.id)
+        ? `<button type="button" class="chip is-on" disabled aria-label="${esc(i.name)} is on the list">✓ ${esc(i.name)}</button>`
+        : `<button type="button" class="chip" data-quick="${i.id}">+ ${esc(i.name)}${amount}</button>`;
+    }).join('')}</div>`;
+  }
+
+  async function quickAdd(itemId, d) {
+    const item = L.itemById(state, itemId);
+    if (!item) return;
+    let qty = item.multiUse ? 1 : L.suggestedQty(item);
+    if (qty == null) {
+      const res = await ask({
+        title: `Add ${item.name} to the list`,
+        input: { label: `Quantity (${item.unit})`, value: '' },
+        buttons: [{ label: 'Cancel', value: null }, { label: 'Add', value: 'add', style: 'primary', needsInput: true }],
+      });
+      if (!res || !(res.input > 0)) return;
+      qty = res.input;
+    }
+    L.addToShopping(state, item.id, qty, 0);
+    commit();
+    const box = $('[data-quick-box]', d);
+    if (box) box.innerHTML = quickPicksHtml();
+  }
+
   function addShoppingSheet() {
     openSheet({
       title: 'Add to the shopping list',
-      html: `${pickerHtml('Quantity')}<div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Add</button></div>`,
-      onMount: mountPicker,
+      autofocus: !state.items.some((i) => i.frequentBuy), // keep the keyboard from covering the shortcuts
+      html: `<section class="quick" data-quick-box>${quickPicksHtml()}</section>
+        ${pickerHtml('Quantity')}<div class="sheet-actions"><button type="button" class="btn" data-close>Done</button><button class="btn primary">Add</button></div>`,
+      onMount: (d, form) => {
+        mountPicker(d, form);
+        $('[data-quick-box]', d).addEventListener('click', (e) => {
+          const b = e.target.closest('[data-quick]');
+          if (b) quickAdd(b.dataset.quick, d);
+        });
+      },
       onSubmit: (form) => {
         const { item, qty } = resolvePicked(form);
         L.addToShopping(state, item.id, qty, 0);
