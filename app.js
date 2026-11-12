@@ -333,7 +333,10 @@
             </button>
           </li>`).join('')}</ul></section>`).join('')
         : empty('Nothing on the list. Plan some meals, or add items yourself.')}
-      ${ticked ? `<div class="foot"><button class="btn" data-act="clear-bought">Clear ${plural(ticked, 'ticked item')}</button></div>` : ''}
+      ${rows.length ? `<div class="foot">
+        ${ticked ? `<button class="btn" data-act="clear-bought">Clear ${plural(ticked, 'ticked item')}</button>` : ''}
+        <button class="btn danger-text" data-act="clear-list">Clear list</button>
+      </div>` : ''}
       ${rows.length ? '<p class="hint">Ticking an item puts it in the cupboard, apart from the amount set aside for this week’s meals.</p>' : ''}`;
   }
 
@@ -1168,6 +1171,18 @@
       commit();
     },
     'clear-bought': () => { L.clearBought(state); commit(); },
+    'clear-list': async () => {
+      const n = state.shopping.length;
+      if (!n) return;
+      const forMeals = state.shopping.some((e) => !e.done && e.reserved > L.EPS);
+      const ok = await confirm('Clear the shopping list?',
+        `This removes all ${plural(n, 'item')}.${forMeals ? ' This week’s planned meals will assume you already have their ingredients.' : ''}${everyone()}`,
+        'Clear list', 'danger');
+      if (!ok) return;
+      L.clearShopping(state);
+      commit();
+      toast('Shopping list cleared.');
+    },
     'new-item': () => editItem(null),
     'edit-item': editItem,
     'item-to-list': async (id) => {

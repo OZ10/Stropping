@@ -198,6 +198,13 @@
 
   const clearBought = (s) => { s.shopping = s.shopping.filter((e) => !e.done); };
 
+  /**
+   * Empty the whole list. Ticked items stay in the cupboard; amounts that were
+   * set aside for planned meals are treated as already in hand, so if such a
+   * meal is later dropped they go back to the cupboard.
+   */
+  const clearShopping = (s) => { s.shopping = []; };
+
   // ---------- Recipes & meals ----------
 
   const scaleQty = (recipe, qty, portions) => round((qty * portions) / (recipe.serves || 1));
@@ -534,7 +541,7 @@
     UNITS, CATEGORIES, EPS, uid, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit,
     cupQty, setCup,
-    addToShopping, buyQty, setBought, clearBought, unreserve,
+    addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,
     scaleQty, planMeal, removeMeal, setCooked, startNewWeek, sweep, heldFor,
     SYNC_COLLECTIONS, toDocs, fromDocs, diffDocs, applyDocChanges,
   };
