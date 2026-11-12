@@ -28,6 +28,8 @@
 
   const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
   const cleanInstructions = (v) => (typeof v === 'string' ? v.slice(0, MAX_INSTRUCTIONS) : '');
+  // Default amount to buy/stock for an item; 0 means "no default set".
+  const cleanDefault = (v) => (Number(v) > 0 ? Math.min(round(v), 1000000) : 0);
 
   const uid = () =>Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
   const round = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -58,6 +60,7 @@
       frequent: !!i.frequent,
       shortLife: !!i.shortLife,
       multiUse: !!i.multiUse,
+      defaultQty: cleanDefault(i.defaultQty),
     }));
     const ids = new Set(s.items.map((i) => i.id));
     s.recipes = raw.recipes.filter((r) => r && r.id && r.name).map((r) => ({
@@ -104,7 +107,7 @@
     return n ? s.items.find((i) => i.name.toLowerCase() === n) : undefined;
   };
 
-  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false }) {
+  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false, defaultQty = 0 }) {
     const existing = findItemByName(s, name);
     if (existing) return existing;
     const item = {
@@ -112,6 +115,7 @@
       unit: UNITS.includes(unit) ? unit : 'each',
       category: CATEGORIES.includes(category) ? category : 'Other',
       frequent: !!frequent, shortLife: !!shortLife, multiUse: !!multiUse,
+      defaultQty: cleanDefault(defaultQty),
     };
     s.items.push(item);
     return item;
@@ -127,6 +131,9 @@
   }
 
   const isCountUnit = (unit) => COUNT_UNITS.has(unit);
+
+  /** Amount to suggest when adding an item: its default, else 1 for countable units, else null. */
+  const suggestedQty = (item) => (item.defaultQty > 0 ? item.defaultQty : isCountUnit(item.unit) ? 1 : null);
 
   // ---------- Cupboard ----------
 
@@ -414,20 +421,20 @@
     const s = emptyState();
     const add = (name, unit, category, flags = {}) => addItem(s, { name, unit, category, ...flags }).id;
     const i = {
-      chicken: add('Chicken breast', 'g', 'Meat & fish', { shortLife: true }),
-      mince: add('Beef mince', 'g', 'Meat & fish', { shortLife: true }),
+      chicken: add('Chicken breast', 'g', 'Meat & fish', { shortLife: true, defaultQty: 500 }),
+      mince: add('Beef mince', 'g', 'Meat & fish', { shortLife: true, defaultQty: 500 }),
       onion: add('Onion', 'each', 'Fruit & veg'),
       garlic: add('Garlic', 'clove', 'Fruit & veg'),
-      spinach: add('Spinach', 'g', 'Fruit & veg', { shortLife: true }),
+      spinach: add('Spinach', 'g', 'Fruit & veg', { shortLife: true, defaultQty: 200 }),
       tomatoes: add('Chopped tomatoes', 'tin', 'Cupboard'),
       coconut: add('Coconut milk', 'tin', 'Cupboard'),
-      rice: add('Basmati rice', 'g', 'Cupboard'),
-      pasta: add('Spaghetti', 'g', 'Cupboard'),
-      flour: add('Plain flour', 'g', 'Cupboard'),
-      milk: add('Milk', 'ml', 'Dairy & eggs', { frequent: true }),
-      eggs: add('Eggs', 'each', 'Dairy & eggs', { frequent: true }),
-      butter: add('Butter', 'g', 'Dairy & eggs', { frequent: true }),
-      cheddar: add('Cheddar', 'g', 'Dairy & eggs'),
+      rice: add('Basmati rice', 'g', 'Cupboard', { defaultQty: 500 }),
+      pasta: add('Spaghetti', 'g', 'Cupboard', { defaultQty: 500 }),
+      flour: add('Plain flour', 'g', 'Cupboard', { defaultQty: 1500 }),
+      milk: add('Milk', 'ml', 'Dairy & eggs', { frequent: true, defaultQty: 2272 }),
+      eggs: add('Eggs', 'each', 'Dairy & eggs', { frequent: true, defaultQty: 6 }),
+      butter: add('Butter', 'g', 'Dairy & eggs', { frequent: true, defaultQty: 250 }),
+      cheddar: add('Cheddar', 'g', 'Dairy & eggs', { defaultQty: 400 }),
       cumin: add('Ground cumin', 'tsp', 'Herbs & spices', { multiUse: true }),
       paprika: add('Paprika', 'tsp', 'Herbs & spices', { multiUse: true }),
       oil: add('Olive oil', 'tbsp', 'Cupboard', { multiUse: true }),
@@ -496,6 +503,7 @@
           id, name: String(data.name || ''), unit: UNITS.includes(data.unit) ? data.unit : 'each',
           category: CATEGORIES.includes(data.category) ? data.category : 'Other',
           frequent: !!data.frequent, shortLife: !!data.shortLife, multiUse: !!data.multiUse,
+          defaultQty: cleanDefault(data.defaultQty),
         });
       } else if (coll === 'recipes') {
         s.recipes.push({
@@ -548,7 +556,7 @@
 
   const api = {
     UNITS, CATEGORIES, EPS, MAX_INSTRUCTIONS, uid, round, today, emptyState, normalise, sampleState,
-    itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit,
+    itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit, suggestedQty,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,
     scaleQty, planMeal, removeMeal, setCooked, startNewWeek, sweep, heldFor,

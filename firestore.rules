@@ -32,7 +32,8 @@ rules_version = '2';
 //
 // Subcollections: households/{hid}/{collection}/{docId}, collection is one of:
 //   items/{id}:    id (== docId), name (1–100), unit (enum), category (enum),
-//                  frequent, shortLife, multiUse (bool); all required
+//                  frequent, shortLife, multiUse (bool); all required.
+//                  Optional: defaultQty (number 0–1,000,000; 0 = none)
 //   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
 //                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty}),
 //                  instructions (optional string ≤ 20,000)
@@ -165,7 +166,9 @@ service cloud.firestore {
     }
 
     function isValidItem(docId, d) {
-      return hasExactFields(d, ['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse'])
+      return d.keys().hasAll(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse'])
+        && d.keys().hasOnly(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse', 'defaultQty'])
+        && (!('defaultQty' in d) || isAmount(d.defaultQty))
         && d.id == docId
         && isShortString(d.name, 1, 100)
         && d.unit in ['each', 'g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice', 'pinch']

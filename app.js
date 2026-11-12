@@ -354,7 +354,7 @@
           <li data-name="${esc(item.name.toLowerCase())}">
             <button class="row-main" data-act="edit-item" data-id="${item.id}">
               <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span>
-              <span class="sub">${esc(item.unit)}</span>
+              <span class="sub" title="${item.defaultQty > 0 ? 'Default amount' : 'Unit'}">${esc(item.defaultQty > 0 && !item.multiUse ? fmtQty(item.defaultQty, item.unit) : item.unit)}</span>
             </button>
             ${onList.has(item.id) ? '<span class="on-list">On list</span>' : `<button class="btn small" data-act="item-to-list" data-id="${item.id}" aria-label="Add ${esc(item.name)} to shopping list">+ List</button>`}
           </li>`).join('')}</ul></section>`).join('')
@@ -780,7 +780,7 @@
   }
 
   function editItem(id) {
-    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false };
+    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false, defaultQty: 0 };
     const flag = (name, title, desc) => `<label class="toggle"><input type="checkbox" name="${name}"${item[name] ? ' checked' : ''}>
       <span><strong>${title}</strong><small>${desc}</small></span></label>`;
     openSheet({
@@ -790,6 +790,12 @@
         <div class="two">
           <label class="field"><span>Unit</span><select name="unit">${unitOptions(item.unit)}</select></label>
           <label class="field"><span>Category</span><select name="category">${catOptions(item.category)}</select></label>
+        </div>
+        <div class="default-qty">
+          <label class="field"><span>Default amount <em data-default-unit>(${esc(item.unit)})</em></span>
+            <input name="defaultQty" type="number" min="0" step="any" inputmode="decimal" placeholder="None" value="${item.defaultQty > 0 ? num(item.defaultQty) : ''}">
+          </label>
+          <p class="hint">Filled in for you when you add this item to the shopping list or cupboard.</p>
         </div>
         <fieldset class="flags"><legend>Options</legend>
           ${flag('frequent', 'Frequently used', 'Also used outside recipes, like milk. Before it’s taken from the cupboard you’ll be asked whether it’s really still there.')}
@@ -804,6 +810,14 @@
         </div>`,
       onMount: (d, form) => {
         form.name.addEventListener('input', () => form.name.setCustomValidity(''));
+        // Default amount: label follows the unit; not used for multi-use items.
+        const syncDefault = () => {
+          $('[data-default-unit]', d).textContent = `(${form.unit.value})`;
+          $('.default-qty', d).hidden = form.multiUse.checked;
+        };
+        form.unit.addEventListener('change', syncDefault);
+        form.multiUse.addEventListener('change', syncDefault);
+        syncDefault();
         const del = $('[data-del]', d);
         if (del) del.addEventListener('click', async () => {
           const used = L.itemUsage(state, id);
@@ -828,6 +842,7 @@
         const data = {
           name, unit: form.unit.value, category: form.category.value,
           frequent: form.frequent.checked, shortLife: form.shortLife.checked, multiUse: form.multiUse.checked,
+          defaultQty: parseFloat(form.defaultQty.value) > 0 ? L.round(parseFloat(form.defaultQty.value)) : 0,
         };
         const existing = L.itemById(state, id);
         if (existing) {
@@ -858,8 +873,15 @@
   }
 
   function mountPicker(d, form) {
+    // Pre-fill the item's default amount until the user types their own.
+    let typedQty = false;
+    form.qty.addEventListener('input', () => { typedQty = true; });
     const sync = () => {
       const item = L.findItemByName(state, form.item.value);
+      if (!typedQty) {
+        const sq = item ? L.suggestedQty(item) : null;
+        form.qty.value = sq == null ? '' : num(sq);
+      }
       $('.new-fields', d).hidden = !(form.item.value.trim() && !item);
       $('[data-unit]', d).textContent = `(${item ? item.unit : form.unit.value})`;
       const multi = !!(item && item.multiUse);
@@ -1201,7 +1223,7 @@
       }
       const res = await ask({
         title: `Add ${item.name} to the list`,
-        input: { label: `Quantity (${item.unit})`, value: L.isCountUnit(item.unit) ? '1' : '' },
+        input: { label: `Quantity (${item.unit})`, value: L.suggestedQty(item) == null ? '' : num(L.suggestedQty(item)) },
         buttons: [{ label: 'Cancel', value: null }, { label: 'Add', value: 'add', style: 'primary', needsInput: true }],
       });
       if (!res || !(res.input > 0)) return;
