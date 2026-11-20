@@ -67,6 +67,18 @@ Changes appear on everyone's phone within a second or two. Without signal (in th
 
 **Leave** or **Sign out** stops syncing. The phone keeps its own copy of the data.
 
+## Running the tests
+
+The app needs no install, but the tests use a small browser-driving library and Edge or Chrome:
+
+```
+npm install      # once
+npm test         # everything: logic, the app, sharing, offline
+npm test -- app  # or just one of: logic, app, sync, offline
+```
+
+Screenshots from the browser tests are saved in `tests/output/`. The sharing tests use an in-memory stand-in for Firebase, so they check the app's sync code, not the live database or its security rules.
+
 ## Files
 
 | File | Purpose |
@@ -78,6 +90,7 @@ Changes appear on everyone's phone within a second or two. Without signal (in th
 | `sync.js` | Household sharing via Firebase (loads only when configured) |
 | `firebase-config.js` | Your Firebase project settings, or `null` for no sharing |
 | `firestore.rules` | Database security rules to paste into the Firebase console |
+| `tests/`, `package.json` | Automated tests (not needed to run the app) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | PWA: offline cache, install metadata, icons |
 
 The original 2016 Android version of Stropping is still in the git history (up to commit `4812342`).
