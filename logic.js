@@ -8,7 +8,7 @@
  *
  * State shape:
  *   items:    [{ id, name, unit, category, frequent, shortLife, multiUse }]
- *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty }], instructions, labels: [name] }]
+ *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty, optional }], instructions, labels: [name] }]
  *   labels:   [name]  household's recipe labels (always shown alphabetically)
  *   cupboard: { [itemId]: qty }            multi-use items: 1 = in stock
  *   shopping: [{ id, itemId, qty, reserved, done, added }]
@@ -43,6 +43,8 @@
 
   const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
   const cleanInstructions = (v) => (typeof v === 'string' ? v.slice(0, MAX_INSTRUCTIONS) : '');
+  // A recipe ingredient. Optional ones (#49) are only used when picked for that meal.
+  const cleanIngredient = (g) => ({ itemId: g.itemId, qty: round(g.qty), optional: !!g.optional });
   // Default amount to buy/stock for an item; 0 means "no default set".
   const cleanDefault = (v) => (Number(v) > 0 ? Math.min(round(v), 1000000) : 0);
 
@@ -234,7 +236,7 @@
       serves: Number(r.serves) > 0 ? Number(r.serves) : 1,
       ingredients: (Array.isArray(r.ingredients) ? r.ingredients : [])
         .filter((g) => g && ids.has(g.itemId))
-        .map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
+        .map(cleanIngredient),
       instructions: cleanInstructions(r.instructions),
       labels: cleanRecipeLabels(r.labels),
     }));
@@ -389,8 +391,9 @@
 
   /**
    * Plan a recipe for this week. Uses what's in the cupboard and puts any
-   * shortfall on the shopping list. Asks about multi-use and frequently used
-   * items. Returns { state, meal, report } or null if cancelled.
+   * shortfall on the shopping list. Asks which optional extras to include
+   * (answer: list of item ids), then about multi-use and frequently used items.
+   * Returns { state, meal, report } or null if cancelled.
    */
   async function planMeal(state, recipeId, portions, ask) {
     const s = clone(state);
@@ -403,10 +406,25 @@
     const report = [];
     const answered = new Map();
 
+    // Optional extras (#49): ask once, up front, which to include this time.
+    const optionals = recipe.ingredients
+      .filter((g) => g.optional && itemById(s, g.itemId))
+      .map((g) => ({ item: itemById(s, g.itemId), need: scaleQty(recipe, g.qty, meal.portions) }));
+    let included = new Set();
+    if (optionals.length) {
+      const chosen = await ask({ kind: 'optional', meal, options: optionals });
+      if (chosen == null) return null;
+      included = new Set(chosen);
+    }
+
     for (const ing of recipe.ingredients) {
       const item = itemById(s, ing.itemId);
       if (!item) continue;
       const need = scaleQty(recipe, ing.qty, meal.portions);
+      if (ing.optional && !included.has(item.id)) {
+        report.push({ item, need, status: 'skipped' });
+        continue;
+      }
 
       if (item.multiUse) {
         if (answered.has(item.id)) continue;
@@ -609,12 +627,12 @@
       bread: add('Bread', 'each', 'Bakery', { frequentBuy: true }),
     };
     const recipe = (name, serves, labels, list, instructions = '') => s.recipes.push({
-      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty]) => ({ itemId, qty })), instructions, labels,
+      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty, opt]) => ({ itemId, qty, optional: opt === 'optional' })), instructions, labels,
     });
     recipe('Chicken curry', 4, ['Gas Hob'], [[i.chicken, 500], [i.onion, 1], [i.garlic, 3], [i.tomatoes, 1], [i.coconut, 1],
-      [i.cumin, 2], [i.paprika, 1], [i.oil, 1], [i.spinach, 100], [i.rice, 300]]);
+      [i.cumin, 2], [i.paprika, 1], [i.oil, 1], [i.spinach, 100, 'optional'], [i.rice, 300]]);
     recipe('Spaghetti bolognese', 4, ['Simple', 'Gas Hob'], [[i.mince, 500], [i.onion, 1], [i.garlic, 2], [i.tomatoes, 2], [i.pasta, 400],
-      [i.oil, 1], [i.cheddar, 50]]);
+      [i.oil, 1], [i.cheddar, 50, 'optional']]);
     recipe('Pancakes', 2, ['Simple', 'Fast', 'Gas Hob'], [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20]],
       '1. Whisk the flour, eggs and milk into a smooth batter. Rest for 10 minutes.\n'
       + '2. Melt a little butter in a frying pan over a medium heat.\n'
@@ -683,7 +701,7 @@
       } else if (coll === 'recipes') {
         s.recipes.push({
           id, name: String(data.name || ''), url: data.url || '', serves: Number(data.serves) > 0 ? Number(data.serves) : 1,
-          ingredients: (Array.isArray(data.ingredients) ? data.ingredients : []).map((g) => ({ itemId: g.itemId, qty: round(g.qty) })),
+          ingredients: (Array.isArray(data.ingredients) ? data.ingredients : []).filter(Boolean).map(cleanIngredient),
           instructions: cleanInstructions(data.instructions),
           labels: cleanRecipeLabels(data.labels),
         });

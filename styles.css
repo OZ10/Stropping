@@ -311,7 +311,12 @@ textarea {
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
 legend { font-size: .85rem; font-weight: 650; color: var(--muted); padding: 0; margin-bottom: 8px; }
 .ing-rows { display: grid; gap: 8px; }
-.ing-row { display: grid; grid-template-columns: 1fr 76px 88px 36px; gap: 6px; align-items: center; }
+.ing-row { display: grid; grid-template-columns: 1fr 76px 88px auto 36px; gap: 6px; align-items: center; }
+.ing-opt { display: flex; align-items: center; gap: 5px; font-size: .8rem; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.ing-opt input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.opt-note { margin-right: 6px; color: var(--muted); font-size: .76rem; font-style: italic; }
+.opt-list { display: grid; gap: 12px; }
+.opt-list .check-line { color: var(--text); font-size: .95rem; }
 .ing-row .icon-btn { width: 36px; height: 36px; }
 .ings .btn { justify-self: start; }
 .ings .hint { margin-top: 0; }
@@ -386,13 +391,14 @@ legend { font-size: .85rem; font-weight: 650; color: var(--muted); padding: 0; m
   /* Ingredient name gets its own line on phones. */
   .ing-rows { gap: 12px; }
   .ing-row {
-    grid-template-columns: 1fr 1fr 36px;
-    grid-template-areas: "name name del" "qty unit del";
+    grid-template-columns: 1fr 1fr auto 36px;
+    grid-template-areas: "name name name del" "qty unit opt del";
     padding-bottom: 12px; border-bottom: 1px solid var(--line);
   }
   .ing-row .ing-name { grid-area: name; }
   .ing-row .ing-qty { grid-area: qty; }
   .ing-row .ing-unit { grid-area: unit; }
+  .ing-row .ing-opt { grid-area: opt; }
   .ing-row .icon-btn { grid-area: del; }
 }
 @media (max-width: 380px) {

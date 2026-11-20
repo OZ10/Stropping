@@ -25,7 +25,8 @@ module.exports = async function appTests() {
       for (let i = 0; i < 10; i++) {
         const t = await h.promptTitle();
         if (/ added$/.test(t)) break;
-        await h.answer(t.includes('Paprika') ? 'No, add to list' : 'Yes');
+        if (t.startsWith('Any optional extras')) await h.answer('Continue');
+        else await h.answer(t.includes('Paprika') ? 'No, add to list' : 'Yes');
       }
       await h.shot('plan-summary');
       await h.answer('Shopping list');
@@ -203,6 +204,47 @@ module.exports = async function appTests() {
       const expected = order.filter((c) => groups.map((g) => g.toLowerCase()).includes(c.toLowerCase()));
       assert.deepEqual(groups.map((g) => g.toLowerCase()), expected.map((c) => c.toLowerCase()), 'shopping groups follow the household order');
       return `groups: ${groups.join(' > ')}`;
+    }],
+
+    ['#49 optional ingredients: marked in the editor, chosen when planning', async () => {
+      await h.tab('Recipes');
+      await h.click('main button', 'Chicken curry');
+      assert.ok((await h.texts('#sheet .ing-list li')).some((t) => t.includes('Spinach') && t.includes('optional')), 'recipe view marks it');
+      await h.click('#sheet button', 'Edit');
+      const optionalRows = await page.$$eval('#sheet .ing-row', (rows) => rows.filter((r) => r.querySelector('.ing-optional').checked).map((r) => r.querySelector('.ing-name').value));
+      assert.deepEqual(optionalRows, ['Spinach']);
+      // mark rice optional too, save
+      await page.evaluate(() => [...document.querySelectorAll('#sheet .ing-row')].find((r) => r.querySelector('.ing-name').value === 'Basmati rice').querySelector('.ing-optional').click());
+      await h.shot('optional-editor');
+      await h.click('#sheet button', 'Save recipe');
+      const curry = (await h.state()).recipes.find((r) => r.name === 'Chicken curry');
+      assert.equal(curry.ingredients.filter((g) => g.optional).length, 2);
+      // plan it: tick spinach only
+      await h.tab('Shopping');
+      if ((await h.state()).shopping.length) { await h.click('main button', 'Clear list'); await h.answer('Clear list'); }
+      await h.tab('Week');
+      await h.click('main button', 'Add meal');
+      await page.select('#sheet select[name=recipe]', curry.id);
+      await h.click('#sheet button', 'Add to week');
+      const title = await h.promptTitle();
+      assert.equal(title, 'Any optional extras this time?');
+      assert.equal((await h.texts('#prompt .opt-list label')).length, 2);
+      await h.shot('optional-prompt');
+      await page.evaluate(() => [...document.querySelectorAll('#prompt .opt-list label')].find((l) => l.textContent.includes('Spinach')).querySelector('input').click());
+      await h.answer('Continue');
+      for (let i = 0; i < 10; i++) {
+        const t = await h.promptTitle();
+        if (/ added$/.test(t)) break;
+        await h.answer('Yes');
+      }
+      assert.ok((await h.texts('#prompt p')).some((t) => t.includes('Basmati rice')), 'summary lists rice as left out');
+      await h.shot('optional-summary');
+      await h.answer('Done');
+      const s = await h.state();
+      const itemId = (n) => s.items.find((i) => i.name === n).id;
+      assert.ok(s.shopping.some((e) => e.itemId === itemId('Spinach')), 'spinach included');
+      const meal = s.week.meals[s.week.meals.length - 1];
+      assert.ok(!meal.alloc.some((a) => a.itemId === itemId('Basmati rice')), 'rice left out');
     }],
 
     ['#48 cupboard search', async () => {

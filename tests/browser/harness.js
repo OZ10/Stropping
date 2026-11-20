@@ -98,7 +98,7 @@ function helpers(page, prefix) {
       for (let i = 0; i < 15; i++) {
         const t = await h.promptTitle();
         if (/ added$/.test(t)) return h.answer('Done');
-        await h.answer(label);
+        await h.answer(t.startsWith('Any optional extras') ? 'Continue' : label);
       }
       throw new Error('Planning never finished');
     },

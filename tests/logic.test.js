@@ -9,12 +9,15 @@ const test = (name, fn) => tests.push({ name, fn });
 const id = (s, name) => L.findItemByName(s, name).id;
 const recipe = (s, name) => s.recipes.find((r) => r.name === name).id;
 const list = (s, name) => s.shopping.find((e) => e.itemId === id(s, name));
+// Optional extras (#49) are all included unless a test says otherwise.
+const allExtras = (q) => q.options.map((o) => o.item.id);
 const scripted = (answers) => async (q) => {
+  if (q.kind === 'optional') return answers.optional ? answers.optional(q) : allExtras(q);
   const key = `${q.kind}:${q.item ? q.item.name : q.meal.name}`;
   if (!(key in answers)) throw new Error(`Unexpected question ${key}`);
   return answers[key];
 };
-const yes = async () => true;
+const yes = async (q) => (q.kind === 'optional' ? allExtras(q) : true);
 
 // ---------- Planning, shopping, weekly review ----------
 
@@ -133,6 +136,38 @@ test('#40 clear list: a later-dropped meal treats its shortfall as in hand', asy
   assert.equal(c.shopping.length, 0);
   c = L.removeMeal(c, c.week.meals[0].id);
   assert.equal(L.cupQty(c, id(c, 'Chicken breast')), 750, '500 from cupboard + 250 assumed in hand');
+});
+
+test('#49 optional ingredients: asked once, first; left-out ones untouched', async () => {
+  let s = L.sampleState();
+  const asked = [];
+  const r = await L.planMeal(s, recipe(s, 'Chicken curry'), 4, async (q) => {
+    asked.push(q.kind);
+    if (q.kind === 'optional') {
+      assert.deepEqual(q.options.map((o) => `${o.item.name} ${o.need}`), ['Spinach 100']);
+      return [];
+    }
+    return true;
+  });
+  assert.equal(asked[0], 'optional', 'extras asked before cupboard questions');
+  assert.equal(asked.filter((k) => k === 'optional').length, 1);
+  s = r.state;
+  assert.equal(list(s, 'Spinach'), undefined, 'left-out spinach not added to the list');
+  assert.ok(!s.week.meals[0].alloc.some((a) => a.itemId === id(s, 'Spinach')));
+  assert.equal(r.report.find((x) => x.item.name === 'Spinach').status, 'skipped');
+  // Included: on the list, scaled
+  let t = L.sampleState();
+  t = (await L.planMeal(t, recipe(t, 'Chicken curry'), 6, yes)).state;
+  assert.equal(list(t, 'Spinach').qty, 150);
+  // No optional ingredients → no question
+  const u = L.sampleState();
+  await L.planMeal(u, recipe(u, 'Pancakes'), 2, async (q) => { assert.notEqual(q.kind, 'optional'); return true; });
+  // Cancelling the extras question cancels planning
+  assert.equal(await L.planMeal(u, recipe(u, 'Chicken curry'), 4, async (q) => (q.kind === 'optional' ? null : true)), null);
+  // The flag survives storage and sync
+  const curry = (st) => st.recipes.find((x) => x.name === 'Chicken curry');
+  assert.equal(curry(L.normalise(JSON.parse(JSON.stringify(u)))).ingredients.find((g) => g.optional).itemId, id(u, 'Spinach'));
+  assert.equal(curry(L.fromDocs(L.toDocs(u))).ingredients.filter((g) => g.optional).length, 1);
 });
 
 test('#43 default amounts', () => {

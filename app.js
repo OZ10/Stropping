@@ -496,7 +496,7 @@
    * With `input`, resolves { value, input } (input is the number entered).
    * A button whose value is null, or pressing Escape, resolves null.
    */
-  function ask({ title, text = '', html = '', buttons, input, progress, stack }) {
+  function ask({ title, text = '', html = '', buttons, input, progress, stack, collect }) {
     return new Promise((resolve) => {
       const d = $('#prompt');
       d.innerHTML = `<form class="prompt-inner">
@@ -518,6 +518,8 @@
       };
       const press = (b) => {
         if (b.value === null) return finish(null);
+        // `collect(dialog)` reads extra controls (e.g. tick boxes) before the dialog closes.
+        if (collect) return finish({ value: b.value, data: collect(d) });
         if (!input) return finish(b.value);
         if (input.type === 'text') {
           const t = field.value.trim();
@@ -564,6 +566,20 @@
   async function flowAsk(q) {
     const item = q.item;
     switch (q.kind) {
+      case 'optional': {
+        const res = await ask({
+          progress: `Planning ${q.meal.name}`,
+          title: 'Any optional extras this time?',
+          text: 'Tick the ones you want for this meal. The rest are left out.',
+          html: `<div class="opt-list">${q.options.map((o) => `<label class="check-line">
+              <input type="checkbox" value="${esc(o.item.id)}">
+              <span><strong>${esc(o.item.name)}</strong>${o.item.multiUse ? '' : ` · ${esc(fmtQty(o.need, o.item.unit))}`}</span>
+            </label>`).join('')}</div>`,
+          collect: (d) => $$('.opt-list input:checked', d).map((i) => i.value),
+          buttons: [CANCEL, { label: 'Continue', value: 'ok', style: 'primary' }],
+        });
+        return res ? res.data : null;
+      }
       case 'multi':
         return ask({
           progress: `Planning ${q.meal.name}`,
@@ -644,10 +660,12 @@
       return `${fmtQty(r.fromCupboard, u)} from the cupboard`;
     };
     const buy = res.report.filter((r) => r.status === 'buy');
-    const have = res.report.filter((r) => r.status !== 'buy');
+    const have = res.report.filter((r) => r.status !== 'buy' && r.status !== 'skipped');
+    const skipped = res.report.filter((r) => r.status === 'skipped');
     const list = (rows) => `<ul class="summary">${rows.map((r) => `<li><strong>${esc(r.item.name)}</strong><span>${esc(line(r))}</span></li>`).join('')}</ul>`;
     const html = (buy.length ? `<h3>Added to the shopping list</h3>${list(buy)}` : '<p>Everything’s in the cupboard, so nothing needs buying.</p>')
-      + (have.length ? `<h3>Already got</h3>${list(have)}` : '');
+      + (have.length ? `<h3>Already got</h3>${list(have)}` : '')
+      + (skipped.length ? `<h3>Left out this time</h3><p>${esc(skipped.map((r) => r.item.name).join(', '))}</p>` : '');
     const v = await ask({
       title: `${res.meal.name} added`,
       text: `${plural(res.meal.portions, 'portion')} planned for this week.`,
@@ -753,7 +771,8 @@
       else if (have >= need - L.EPS) status = '<span class="ok">In cupboard</span>';
       else if (have > L.EPS) status = `<span class="need">Have ${esc(fmtQty(have, item.unit))}</span>`;
       else status = '<span class="need">To buy</span>';
-      return `<li><span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span><span class="qty">${esc(fmtQty(need, item.unit))}${status}</span></li>`;
+      const opt = g.optional ? '<span class="opt-note">optional</span>' : '';
+      return `<li><span class="grow"><span class="title">${esc(item.name)}</span>${opt}${badges(item)}</span><span class="qty">${esc(fmtQty(need, item.unit))}${status}</span></li>`;
     }).join('');
     openSheet({
       title: r.name,
@@ -794,10 +813,11 @@
     });
   }
 
-  const ingRow = (name = '', qty = '', unit = 'each') => `<div class="ing-row">
+  const ingRow = (name = '', qty = '', unit = 'each', optional = false) => `<div class="ing-row">
     <input class="ing-name" list="items-dl" maxlength="100" placeholder="Ingredient" value="${esc(name)}" aria-label="Ingredient" autocomplete="off">
     <input class="ing-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Qty" value="${esc(qty)}" aria-label="Quantity">
     <select class="ing-unit" aria-label="Unit">${unitOptions(unit)}</select>
+    <label class="ing-opt" title="Only used when you choose it for that meal"><input type="checkbox" class="ing-optional"${optional ? ' checked' : ''}><span>Optional</span></label>
     <button type="button" class="icon-btn" data-remove-row aria-label="Remove ingredient">${ICON.x}</button>
   </div>`;
 
@@ -807,7 +827,7 @@
     const pickable = alphabetical([...state.labels, ...r.labels.filter((l) => !state.labels.includes(l))]);
     const rows = r.ingredients.map((g) => {
       const item = L.itemById(state, g.itemId);
-      return item ? ingRow(item.name, num(g.qty), item.unit) : '';
+      return item ? ingRow(item.name, num(g.qty), item.unit, g.optional) : '';
     }).join('') || ingRow();
     openSheet({
       title: id ? 'Edit recipe' : 'New recipe',
@@ -822,7 +842,7 @@
         <fieldset class="ings"><legend>Ingredients</legend>
           <div class="ing-rows">${rows}</div>
           <button type="button" class="btn small" data-add-row>+ Add ingredient</button>
-          <p class="hint">Quantities are for the number of portions above. New names are added to your items list.</p>
+          <p class="hint">Quantities are for the number of portions above. New names are added to your items list. Tick <strong>Optional</strong> for extras you only sometimes add; you’ll be asked each time you plan the meal.</p>
         </fieldset>
         <label class="field"><span>Instructions <em>optional</em></span>
           <textarea name="instructions" rows="8" maxlength="${L.MAX_INSTRUCTIONS}" placeholder="Method, tips, cooking times…">${esc(r.instructions || '')}</textarea>
@@ -864,6 +884,7 @@
           name: $('.ing-name', row).value.trim(),
           qty: parseFloat($('.ing-qty', row).value),
           unit: $('.ing-unit', row).value,
+          optional: $('.ing-optional', row).checked,
         })).filter((x) => x.name);
         const bad = rowsData.find((x) => !(x.qty > 0));
         if (bad) {
@@ -881,6 +902,7 @@
           ingredients: rowsData.map((x) => ({
             itemId: (L.findItemByName(state, x.name) || L.addItem(state, { name: x.name, unit: x.unit })).id,
             qty: L.round(x.qty),
+            optional: x.optional,
           })),
           instructions: form.instructions.value.replace(/\s+$/, '').slice(0, L.MAX_INSTRUCTIONS),
           labels: $$('[data-label-pick] [aria-pressed="true"]', form).map((b) => b.dataset.label),
