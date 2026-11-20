@@ -36,7 +36,10 @@ rules_version = '2';
 //                  (Units and categories are household-editable, see meta/settings,
 //                  so they are length-checked rather than matched against a fixed list.)
 //                  Optional: defaultQty (number 0–1,000,000; 0 = none), frequentBuy (bool),
-//                  location (string ≤ 50; '' = not set)
+//                  location (string ≤ 50; '' = not set),
+//                  packUnit (string ≤ 20; smaller unit recipes use, '' = none),
+//                  packSize (number 0–1,000,000; how many packUnit in one unit, 0 = unknown)
+//   (recipe ingredients may also carry their own unit; list elements aren't checked, see below)
 //   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
 //                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty}),
 //                  instructions (optional string ≤ 20,000), labels (optional list ≤ 20 of names)
@@ -174,7 +177,9 @@ service cloud.firestore {
 
     function isValidItem(docId, d) {
       return d.keys().hasAll(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse'])
-        && d.keys().hasOnly(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse', 'defaultQty', 'frequentBuy', 'location'])
+        && d.keys().hasOnly(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse', 'defaultQty', 'frequentBuy', 'location', 'packUnit', 'packSize'])
+        && (!('packUnit' in d) || isShortString(d.packUnit, 0, 20))
+        && (!('packSize' in d) || isAmount(d.packSize))
         && (!('defaultQty' in d) || isAmount(d.defaultQty))
         && (!('frequentBuy' in d) || d.frequentBuy is bool)
         && (!('location' in d) || isShortString(d.location, 0, 50))

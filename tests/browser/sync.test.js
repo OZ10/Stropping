@@ -41,7 +41,7 @@ module.exports = async function syncTests() {
       await sleep(600);
       const s = await store(a);
       hid = s.find(([k]) => /^households\/[^/]+$/.test(k))[0].split('/')[1];
-      assert.equal(count(s, /\/recipes\//), 3);
+      assert.equal(count(s, /\/recipes\//), 4);
       assert.ok(count(s, /\/items\//) >= 19);
       assert.equal(count(s, /\/meta\//), 4, 'week, settings, labels, locations');
       assert.equal(await a.$eval('#sync-pill', (p) => p.textContent), 'Shared');
@@ -74,7 +74,7 @@ module.exports = async function syncTests() {
       await hb.click('#household button', 'Sign in with Google');
       await sleep(700);
       const s = await hb.state();
-      assert.equal(s.recipes.length, 3);
+      assert.equal(s.recipes.length, 4);
       assert.equal(s.week.meals.length, 1);
       const members = (await store(b)).find(([k]) => k === `households/${hid}`)[1].members;
       assert.deepEqual(members, ['u1', 'u2']);
@@ -90,7 +90,7 @@ module.exports = async function syncTests() {
       await sleep(400);
       const after = await ha.state();
       assert.ok(after.shopping.some((e) => e.id === 'remote1'));
-      assert.equal(after.recipes.length, 2);
+      assert.equal(after.recipes.length, 3);
     }],
 
     ['A ticks an item: only the changed documents are written', async () => {

@@ -43,7 +43,7 @@ test('plan a scaled meal: cupboard first, shortfall to the list, multi-use asked
 test('frequently used items are double-checked; cancelling changes nothing', async () => {
   let s = L.sampleState();
   s = (await L.planMeal(s, recipe(s, 'Pancakes'), 2, scripted({
-    'frequent:Milk': false, 'frequent:Eggs': true, 'frequent:Butter': true,
+    'frequent:Milk': false, 'frequent:Eggs': true, 'frequent:Butter': true, 'unsized:Strawberry jam': true,
   }))).state;
   assert.equal(L.cupQty(s, id(s, 'Milk')), 0);
   assert.equal(list(s, 'Milk').qty, 300);
@@ -74,7 +74,7 @@ test('new week: dropped meals return ingredients, short-life items get checked',
     'multi:Ground cumin': true, 'multi:Paprika': false, 'multi:Olive oil': true,
   }))).state;
   s = (await L.planMeal(s, recipe(s, 'Pancakes'), 2, scripted({
-    'frequent:Milk': false, 'frequent:Eggs': true, 'frequent:Butter': true,
+    'frequent:Milk': false, 'frequent:Eggs': true, 'frequent:Butter': true, 'unsized:Strawberry jam': true,
   }))).state;
   L.setBought(s, list(s, 'Coconut milk').id, true);
   L.setBought(s, list(s, 'Chicken breast').id, true);
@@ -161,7 +161,7 @@ test('#49 optional ingredients: asked once, first; left-out ones untouched', asy
   assert.equal(list(t, 'Spinach').qty, 150);
   // No optional ingredients → no question
   const u = L.sampleState();
-  await L.planMeal(u, recipe(u, 'Pancakes'), 2, async (q) => { assert.notEqual(q.kind, 'optional'); return true; });
+  await L.planMeal(u, recipe(u, 'Cheese on toast'), 1, async (q) => { assert.notEqual(q.kind, 'optional'); return true; });
   // Cancelling the extras question cancels planning
   assert.equal(await L.planMeal(u, recipe(u, 'Chicken curry'), 4, async (q) => (q.kind === 'optional' ? null : true)), null);
   // The flag survives storage and sync
@@ -325,6 +325,60 @@ test('#46 locations: assign, rename/delete cascade, sweep one location, own sync
   assert.deepEqual(docs.get('meta/locations'), { locations: s.locations });
   assert.equal(L.fromDocs(docs).items.find((i) => i.name === 'Paprika').location, 'Big cupboard');
   assert.deepEqual(L.normalise({ items: [{ id: 'a', name: 'A' }], recipes: [] }).items[0].location, '');
+});
+
+test('#50 units convert within groups', () => {
+  assert.equal(L.convertUnits(1, 'tbsp', 'tsp'), 3);
+  assert.equal(L.convertUnits(2, 'kg', 'g'), 2000);
+  assert.equal(L.convertUnits(1, 'l', 'ml'), 1000);
+  assert.equal(L.convertUnits(3, 'tsp', 'ml'), 15);
+  assert.equal(L.convertUnits(1, 'g', 'ml'), null, 'weight ↔ volume never converts');
+  assert.equal(L.convertUnits(1, 'slice', 'loaf'), null);
+  assert.deepEqual(L.groupUnits('kg').sort(), ['g', 'kg']);
+  assert.deepEqual(L.groupUnits('jar'), ['jar']);
+});
+
+test('#50 items with a recipe unit: counted with a size, in-stock check without', async () => {
+  let s = L.sampleState();
+  const bread = L.findItemByName(s, 'Bread');
+  const jam = L.findItemByName(s, 'Strawberry jam');
+  assert.deepEqual([bread.unit, bread.packUnit, bread.packSize], ['loaf', 'slice', 20]);
+  assert.deepEqual(L.unitsForItem(bread).sort(), ['loaf', 'slice']);
+  assert.deepEqual(L.unitsForItem(jam).sort(), ['jar', 'ml', 'l', 'pint', 'tbsp', 'tsp'].sort());
+  assert.equal(L.toItemUnit(bread, 2, 'slice'), 0.1);
+  assert.equal(L.toItemUnit(bread, 1, 'loaf'), 1);
+  assert.equal(L.toItemUnit(jam, 1, 'tbsp'), null, 'no size → cannot count');
+  assert.equal(L.toItemUnit(L.findItemByName(s, 'Milk'), 2, 'tbsp'), 30, 'tbsp of milk counted in ml');
+  // Cheese on toast: 2 slices of a 20-slice loaf come out of the cupboard
+  s = (await L.planMeal(s, recipe(s, 'Cheese on toast'), 1, yes)).state;
+  assert.equal(L.cupQty(s, id(s, 'Bread')), 0.9);
+  // Pancakes with jam: asked whether you have it, jar count untouched
+  const asked = [];
+  const r = await L.planMeal(s, recipe(s, 'Pancakes'), 2, async (q) => {
+    asked.push(q.kind);
+    if (q.kind === 'optional') return q.options.map((o) => o.item.id);
+    if (q.kind === 'unsized') { assert.equal(q.unit, 'tbsp'); assert.equal(q.need, 1); return true; }
+    return true;
+  });
+  assert.ok(asked.includes('unsized'));
+  assert.equal(L.cupQty(r.state, id(s, 'Strawberry jam')), 1, 'jar count unchanged');
+  // Said no → one jar on the list, cupboard emptied
+  const r2 = await L.planMeal(s, recipe(s, 'Pancakes'), 2, async (q) => (q.kind === 'optional' ? q.options.map((o) => o.item.id) : q.kind !== 'unsized'));
+  assert.equal(r2.state.shopping.find((e) => e.itemId === id(s, 'Strawberry jam')).qty, 1);
+  assert.equal(L.cupQty(r2.state, id(s, 'Strawberry jam')), 0);
+  // A size given later makes it countable: 1 tbsp of a jar holding 60 tsp = 0.05 jar
+  jam.packSize = 60;
+  assert.equal(L.toItemUnit(jam, 1, 'tbsp'), 0.05);
+});
+
+test('#50 recipe units and item recipe-units survive storage and sync; bad values cleaned', () => {
+  const s = L.sampleState();
+  const toast = (st) => st.recipes.find((r) => r.name === 'Cheese on toast');
+  assert.equal(toast(s).ingredients[0].unit, 'slice');
+  assert.deepEqual(L.normalise(JSON.parse(JSON.stringify(s))), s);
+  assert.deepEqual(L.fromDocs(L.toDocs(s)), s);
+  const n = L.normalise({ items: [{ id: 'a', name: 'A', unit: 'jar', packUnit: 'jar', packSize: 5 }, { id: 'b', name: 'B', unit: 'jar', packUnit: 'furlong', packSize: 5 }, { id: 'c', name: 'C', unit: 'loaf', packUnit: 'slice', packSize: -2 }], recipes: [] });
+  assert.deepEqual(n.items.map((i) => [i.packUnit, i.packSize]), [['', 0], ['', 0], ['slice', 0]]);
 });
 
 module.exports = { test, tests, L, id, recipe, list, yes };

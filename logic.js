@@ -26,9 +26,15 @@
   'use strict';
 
   // Built-in units. Households can add their own (settings.customUnits).
-  const UNITS = ['each', 'g', 'kg', 'ml', 'l', 'pint', 'tsp', 'tbsp', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice', 'pinch'];
+  const UNITS = ['each', 'g', 'kg', 'ml', 'l', 'pint', 'tsp', 'tbsp', 'clove', 'bulb', 'tin', 'jar', 'pack', 'box',
+    'bottle', 'bunch', 'loaf', 'slice', 'pinch'];
   // Built-in units you can only buy whole numbers of.
-  const COUNT_UNITS = new Set(['each', 'clove', 'tin', 'jar', 'pack', 'bottle', 'bunch', 'slice']);
+  const COUNT_UNITS = new Set(['each', 'clove', 'bulb', 'tin', 'jar', 'pack', 'box', 'bottle', 'bunch', 'loaf', 'slice']);
+  // Units that convert automatically (#50): [group, size in the group's base unit].
+  const UNIT_FACTORS = {
+    g: ['weight', 1], kg: ['weight', 1000],
+    ml: ['volume', 1], l: ['volume', 1000], pint: ['volume', 568.261], tsp: ['volume', 5], tbsp: ['volume', 15],
+  };
   // Default categories, in shopping-list order. Households can edit them (settings.categories).
   const CATEGORIES = ['Fruit & veg', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Cupboard', 'Herbs & spices', 'Frozen', 'Drinks', 'Household', 'Other'];
   const FALLBACK_CATEGORY = 'Other'; // always present; can't be renamed or deleted
@@ -49,7 +55,11 @@
   const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
   const cleanInstructions = (v) => (typeof v === 'string' ? v.slice(0, MAX_INSTRUCTIONS) : '');
   // A recipe ingredient. Optional ones (#49) are only used when picked for that meal.
-  const cleanIngredient = (g) => ({ itemId: g.itemId, qty: round(g.qty), optional: !!g.optional });
+  // `unit` is the recipe's own unit (#50); '' means the item's unit.
+  const cleanIngredient = (g) => ({
+    itemId: g.itemId, qty: round(g.qty), optional: !!g.optional,
+    unit: typeof g.unit === 'string' ? g.unit.slice(0, MAX_UNIT_NAME) : '',
+  });
   // Default amount to buy/stock for an item; 0 means "no default set".
   const cleanDefault = (v) => (Number(v) > 0 ? Math.min(round(v), 1000000) : 0);
 
@@ -130,7 +140,7 @@
     s.settings.customUnits.push({ name: n, count: !!count });
   }
 
-  const unitUsage = (s, name) => s.items.filter((i) => i.unit === name);
+  const unitUsage = (s, name) => s.items.filter((i) => i.unit === name || i.packUnit === name);
 
   function removeUnit(s, name) {
     const used = unitUsage(s, name);
@@ -263,6 +273,7 @@
       defaultQty: cleanDefault(i.defaultQty),
       frequentBuy: !!i.frequentBuy,
       location: cleanItemLocation(i.location),
+      ...cleanPack(s, validUnit(s, i.unit), i.packUnit, i.packSize),
     }));
     const ids = new Set(s.items.map((i) => i.id));
     s.recipes = raw.recipes.filter((r) => r && r.id && r.name).map((r) => ({
@@ -310,12 +321,16 @@
     return n ? s.items.find((i) => i.name.toLowerCase() === n) : undefined;
   };
 
-  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false, defaultQty = 0, frequentBuy = false, location = '' }) {
+  function addItem(s, {
+    name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false,
+    defaultQty = 0, frequentBuy = false, location = '', packUnit = '', packSize = 0,
+  }) {
     const existing = findItemByName(s, name);
     if (existing) return existing;
     const item = {
       id: uid(), name: String(name).trim(),
       unit: validUnit(s, unit),
+      ...cleanPack(s, validUnit(s, unit), packUnit, packSize),
       category: validCategory(s, category),
       frequent: !!frequent, shortLife: !!shortLife, multiUse: !!multiUse,
       defaultQty: cleanDefault(defaultQty),
@@ -333,6 +348,47 @@
     s.items = s.items.filter((i) => i.id !== id);
     delete s.cupboard[id];
     s.shopping = s.shopping.filter((e) => e.itemId !== id);
+  }
+
+  // ---------- Unit conversion (#50) ----------
+  //
+  // An item has the unit you buy it in (item.unit) and optionally a smaller
+  // unit recipes use (item.packUnit) with how many are in one (item.packSize,
+  // 0 = not known). Recipes can use any unit that converts to either.
+
+  /** Validated recipe unit + size for an item. */
+  function cleanPack(s, itemUnit, packUnit, packSize) {
+    const pu = typeof packUnit === 'string' && packUnit !== itemUnit && unitsFor(s).includes(packUnit) ? packUnit : '';
+    return { packUnit: pu, packSize: pu ? cleanDefault(packSize) : 0 };
+  }
+
+  const unitGroup = (u) => (UNIT_FACTORS[u] ? UNIT_FACTORS[u][0] : null);
+  /** The unit plus any it converts to automatically (g → g, kg). */
+  const groupUnits = (u) => (unitGroup(u) ? Object.keys(UNIT_FACTORS).filter((x) => unitGroup(x) === unitGroup(u)) : [u]);
+
+  /** Convert between units in the same group; null if they don't convert. */
+  function convertUnits(qty, from, to) {
+    if (from === to) return qty;
+    if (!unitGroup(from) || unitGroup(from) !== unitGroup(to)) return null;
+    return (qty * UNIT_FACTORS[from][1]) / UNIT_FACTORS[to][1];
+  }
+
+  /** Units a recipe may use for this item. */
+  const unitsForItem = (item) => [...new Set([...groupUnits(item.unit), ...(item.packUnit ? groupUnits(item.packUnit) : [])])];
+
+  /**
+   * An amount in a recipe's unit, in the item's own unit; null when it can't
+   * be worked out (e.g. tsp of a jar of jam with no size given).
+   */
+  function toItemUnit(item, qty, unit) {
+    const u = unit || item.unit;
+    const direct = convertUnits(qty, u, item.unit);
+    if (direct != null) return round(direct);
+    if (item.packUnit && item.packSize > 0) {
+      const inPack = convertUnits(qty, u, item.packUnit);
+      if (inPack != null) return round(inPack / item.packSize);
+    }
+    return null;
   }
 
   /** Units bought in whole numbers: built-in countable units plus custom units marked as such. */
@@ -446,7 +502,7 @@
     // Optional extras (#49): ask once, up front, which to include this time.
     const optionals = recipe.ingredients
       .filter((g) => g.optional && itemById(s, g.itemId))
-      .map((g) => ({ item: itemById(s, g.itemId), need: scaleQty(recipe, g.qty, meal.portions) }));
+      .map((g) => ({ item: itemById(s, g.itemId), need: scaleQty(recipe, g.qty, meal.portions), unit: g.unit || itemById(s, g.itemId).unit }));
     let included = new Set();
     if (optionals.length) {
       const chosen = await ask({ kind: 'optional', meal, options: optionals });
@@ -457,29 +513,37 @@
     for (const ing of recipe.ingredients) {
       const item = itemById(s, ing.itemId);
       if (!item) continue;
-      const need = scaleQty(recipe, ing.qty, meal.portions);
+      const recipeUnit = ing.unit || item.unit;
+      const recipeNeed = scaleQty(recipe, ing.qty, meal.portions);
       if (ing.optional && !included.has(item.id)) {
-        report.push({ item, need, status: 'skipped' });
+        report.push({ item, need: recipeNeed, unit: recipeUnit, status: 'skipped' });
         continue;
       }
 
-      if (item.multiUse) {
+      // Amount in the item's own unit; null when it can't be counted (#50).
+      const need = item.multiUse ? null : toItemUnit(item, recipeNeed, recipeUnit);
+
+      // In-stock check instead of counting: multi-use items, and recipe units
+      // that don't convert (e.g. tsp of a jar of jam with no size given).
+      if (need == null) {
         if (answered.has(item.id)) continue;
         if (unboughtEntry(s, item.id)) {
           answered.set(item.id, true);
-          report.push({ item, need, status: 'on-list' });
+          report.push({ item, need: recipeNeed, unit: recipeUnit, status: 'on-list' });
           continue;
         }
-        const has = await ask({ kind: 'multi', item, meal, need });
+        const kind = item.multiUse ? 'multi' : 'unsized';
+        const has = await ask({ kind, item, meal, need: recipeNeed, unit: recipeUnit });
         if (has == null) return null;
         answered.set(item.id, has);
         if (has) {
-          setCup(s, item.id, 1);
-          report.push({ item, need, status: 'have' });
+          if (item.multiUse) setCup(s, item.id, 1);
+          else if (cupQty(s, item.id) <= EPS) setCup(s, item.id, 1);
+          report.push({ item, need: recipeNeed, unit: recipeUnit, status: 'have' });
         } else {
           setCup(s, item.id, 0);
           addToShopping(s, item.id, 1, 0);
-          report.push({ item, need, status: 'buy', toShop: 1 });
+          report.push({ item, need: recipeNeed, unit: recipeUnit, status: 'buy', toShop: 1, inStockCheck: true });
         }
         continue;
       }
@@ -499,7 +563,7 @@
       const short = round(need - take);
       if (short > EPS) addToShopping(s, item.id, short, short);
       meal.alloc.push({ itemId: item.id, need, fromCupboard: take, toShop: short });
-      report.push({ item, need, fromCupboard: take, toShop: short, status: short > EPS ? 'buy' : 'cupboard' });
+      report.push({ item, need, unit: item.unit, fromCupboard: take, toShop: short, status: short > EPS ? 'buy' : 'cupboard' });
     }
 
     s.week.meals.push(meal);
@@ -662,22 +726,25 @@
       paprika: add('Paprika', 'tsp', 'Herbs & spices', { multiUse: true }),
       oil: add('Olive oil', 'tbsp', 'Cupboard', { multiUse: true }),
       kitchenRoll: add('Kitchen roll', 'pack', 'Household', { frequentBuy: true }),
-      bread: add('Bread', 'each', 'Bakery', { frequentBuy: true }),
+      bread: add('Bread', 'loaf', 'Bakery', { frequentBuy: true, packUnit: 'slice', packSize: 20 }),
+      jam: add('Strawberry jam', 'jar', 'Cupboard', { packUnit: 'tsp' }),
     };
     const where = {
       Fridge: [i.chicken, i.mince, i.spinach, i.milk, i.eggs, i.butter, i.cheddar],
-      Pantry: [i.onion, i.garlic, i.tomatoes, i.coconut, i.rice, i.pasta, i.flour, i.bread],
+      Pantry: [i.onion, i.garlic, i.tomatoes, i.coconut, i.rice, i.pasta, i.flour, i.bread, i.jam],
       'Tall cupboard': [i.cumin, i.paprika, i.oil, i.kitchenRoll],
     };
     for (const [loc, list] of Object.entries(where)) for (const itemId of list) itemById(s, itemId).location = loc;
     const recipe = (name, serves, labels, list, instructions = '') => s.recipes.push({
-      id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty, opt]) => ({ itemId, qty, optional: opt === 'optional' })), instructions, labels,
+      id: uid(), name, url: '', serves, instructions, labels,
+      ingredients: list.map(([itemId, qty, opt, unit]) => ({ itemId, qty, optional: opt === 'optional', unit: unit || '' })),
     });
     recipe('Chicken curry', 4, ['Gas Hob'], [[i.chicken, 500], [i.onion, 1], [i.garlic, 3], [i.tomatoes, 1], [i.coconut, 1],
       [i.cumin, 2], [i.paprika, 1], [i.oil, 1], [i.spinach, 100, 'optional'], [i.rice, 300]]);
     recipe('Spaghetti bolognese', 4, ['Simple', 'Gas Hob'], [[i.mince, 500], [i.onion, 1], [i.garlic, 2], [i.tomatoes, 2], [i.pasta, 400],
       [i.oil, 1], [i.cheddar, 50, 'optional']]);
-    recipe('Pancakes', 2, ['Simple', 'Fast', 'Gas Hob'], [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20]],
+    recipe('Cheese on toast', 1, ['Fast', 'Oven'], [[i.bread, 2, '', 'slice'], [i.cheddar, 40], [i.butter, 10]]);
+    recipe('Pancakes', 2, ['Simple', 'Fast', 'Gas Hob'], [[i.flour, 100], [i.eggs, 2], [i.milk, 300], [i.butter, 20], [i.jam, 1, 'optional', 'tbsp']],
       '1. Whisk the flour, eggs and milk into a smooth batter. Rest for 10 minutes.\n'
       + '2. Melt a little butter in a frying pan over a medium heat.\n'
       + '3. Pour in a thin layer of batter, cook for about a minute, flip and cook the other side.\n'
@@ -685,6 +752,7 @@
     Object.assign(s.cupboard, {
       [i.rice]: 1000, [i.pasta]: 500, [i.onion]: 3, [i.garlic]: 6, [i.tomatoes]: 2, [i.flour]: 1000,
       [i.milk]: 1000, [i.eggs]: 6, [i.butter]: 250, [i.cumin]: 1, [i.paprika]: 1, [i.oil]: 1, [i.chicken]: 500,
+      [i.bread]: 1, [i.jam]: 1,
     });
     return s;
   }
@@ -743,6 +811,8 @@
           defaultQty: cleanDefault(data.defaultQty),
           frequentBuy: !!data.frequentBuy,
           location: cleanItemLocation(data.location),
+          packUnit: typeof data.packUnit === 'string' ? data.packUnit : '',
+          packSize: cleanDefault(data.packSize),
         });
       } else if (coll === 'recipes') {
         s.recipes.push({
@@ -807,6 +877,7 @@
     DEFAULT_LABELS, MAX_LABEL_NAME, addLabel, renameLabel, removeLabel, labelUsage, recipesWithLabels,
     DEFAULT_LOCATIONS, MAX_LOCATION_NAME, addLocation, renameLocation, removeLocation, locationUsage, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit, suggestedQty,
+    convertUnits, unitsForItem, toItemUnit, groupUnits,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,
     scaleQty, planMeal, removeMeal, setCooked, startNewWeek, sweep, heldFor,

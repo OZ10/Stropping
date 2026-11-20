@@ -1,4 +1,4 @@
-﻿// Browser tests for the app on one device (sharing switched off).
+// Browser tests for the app on one device (sharing switched off).
 const { assert, sleep, startServer, launch, newPage, helpers, steps, LOCAL_ONLY } = require('./harness');
 
 module.exports = async function appTests() {
@@ -13,7 +13,7 @@ module.exports = async function appTests() {
       await page.goto('http://localhost:8771/');
       await h.click('main button', 'Try sample data');
       const s = await h.state();
-      assert.equal(s.recipes.length, 3);
+      assert.equal(s.recipes.length, 4);
       return `${s.items.length} items`;
     }],
 
@@ -54,6 +54,7 @@ module.exports = async function appTests() {
 
     ['#40 clear the whole shopping list', async () => {
       await h.click('main button', 'Add meal');
+      await page.select('#sheet select[name=recipe]', await page.$eval('#sheet select[name=recipe]', (sel) => [...sel.options].find((o) => o.text === 'Chicken curry').value));
       await h.click('#sheet button', 'Add to week');
       await h.answerPlanning();
       await h.tab('Shopping');
@@ -172,30 +173,30 @@ module.exports = async function appTests() {
       await h.click('#sheet button', 'Cancel');
     }],
 
-    ['#47 pick-lists are Aâ€“Z; shopping groups keep the household order', async () => {
+    ['#47 pick-lists are A–Z; shopping groups keep the household order', async () => {
       const isAlpha = (list) => list.every((v, i) => i === 0 || list[i - 1].localeCompare(v, undefined, { sensitivity: 'base' }) <= 0);
       await h.tab('Items');
       await h.click('main button', 'Onion');
       const cats = await h.texts('#sheet select[name=category] option');
       assert.equal(cats[cats.length - 1], 'Other', 'Other last');
-      assert.ok(isAlpha(cats.slice(0, -1)), `categories Aâ€“Z: ${cats.join(', ')}`);
+      assert.ok(isAlpha(cats.slice(0, -1)), `categories A–Z: ${cats.join(', ')}`);
       const units = await h.texts('#sheet select[name=unit] option');
-      assert.ok(isAlpha(units) && units.includes('punnet'), `units Aâ€“Z: ${units.join(', ')}`);
+      assert.ok(isAlpha(units) && units.includes('punnet'), `units A–Z: ${units.join(', ')}`);
       await page.keyboard.press('Escape');
       await sleep(200);
       await h.click('main button', '+ New item');
       const suggestions = await page.$$eval('#items-dl option', (os) => os.map((o) => o.value));
-      assert.ok(isAlpha(suggestions), 'item suggestions Aâ€“Z');
+      assert.ok(isAlpha(suggestions), 'item suggestions A–Z');
       await page.keyboard.press('Escape');
       await sleep(200);
       await h.tab('Recipes');
       const pressed = await page.$$eval('main .chips.filter .chip[aria-pressed="true"]', (cs) => cs.map((c) => c.textContent.trim()));
       const stored = await page.evaluate(() => localStorage.getItem('stropping:recipeFilter'));
       const filters = await h.texts('main .chips.filter .chip[data-label]');
-      assert.ok(isAlpha(filters), `label filters Aâ€“Z: ${filters.join(', ')}`);
+      assert.ok(isAlpha(filters), `label filters A–Z: ${filters.join(', ')}`);
       assert.deepEqual(pressed, [], `no filter left on (pressed: ${pressed.join(', ')}; stored: ${stored})`);
       await h.click('main button', 'Labels');
-      assert.ok(isAlpha(await page.$$eval('#sheet [data-entry]', (es) => es.map((e) => e.dataset.entry))), 'Labels screen Aâ€“Z');
+      assert.ok(isAlpha(await page.$$eval('#sheet [data-entry]', (es) => es.map((e) => e.dataset.entry))), 'Labels screen A–Z');
       assert.equal(await page.$$eval('#sheet [data-entry-act="up"]', (b) => b.length), 0, 'no reordering for labels');
       await h.click('#sheet button', 'Done');
       await h.tab('Shopping');
@@ -248,7 +249,6 @@ module.exports = async function appTests() {
     }],
 
     ['#46 locations: set on items, managed, cupboard grouped/searched/swept by location', async () => {
-      // manage: add Garage
       await h.tab('Items');
       await h.click('main button', 'Item settings');
       await page.type('#sheet [data-list="locations"] [data-new-entry]', 'Garage');
@@ -257,31 +257,28 @@ module.exports = async function appTests() {
       assert.ok((await h.state()).locations.includes('Garage'));
       await h.shot('item-settings-locations');
       await h.click('#sheet button', 'Done');
-      // set on an item
       await h.click('main button', 'Kitchen roll');
       const locs = await h.texts('#sheet select[name=location] option');
       assert.deepEqual(locs, ['Not set', 'Freezer', 'Fridge', 'Garage', 'Pantry', 'Tall cupboard']);
       await page.select('#sheet select[name=location]', 'Garage');
       await h.click('#sheet button', 'Save');
       assert.equal((await h.state()).items.find((i) => i.name === 'Kitchen roll').location, 'Garage');
-      // cupboard: put kitchen roll in, group by location
       await h.tab('Cupboard');
       await h.click('main button', '+ Add');
       await page.type('#sheet input[name=item]', 'Kitchen roll');
       await h.clickSel('#sheet .sheet-actions .btn.primary');
       await h.click('main .segmented button', 'Location');
       const groups = await h.texts('main .group h3');
-      assert.deepEqual(groups, [...groups].sort((a, b) => (a === 'No location') - (b === 'No location') || a.localeCompare(b)), `A–Z, No location last: ${groups.join(', ')}`);
+      const expected = [...groups].sort((a, b) => (a === 'No location') - (b === 'No location') || a.localeCompare(b));
+      assert.deepEqual(groups, expected, `A–Z, No location last: ${groups.join(', ')}`);
       assert.ok(groups.includes('Garage') && groups.includes('Fridge'));
       await h.shot('cupboard-by-location');
       await page.reload();
       await sleep(300);
       assert.equal(await page.$eval('main .segmented [aria-pressed="true"]', (b) => b.textContent), 'Location', 'grouping remembered');
-      // search matches location
       await h.setValue('#view [data-search]', 'garage');
       assert.deepEqual(await visibleRows(), ['Kitchen roll']);
       await h.setValue('#view [data-search]', '');
-      // sweep just the fridge
       await h.click('main button', 'Sweep');
       assert.equal(await h.promptTitle(), 'Sweep which location?');
       await h.shot('sweep-which');
@@ -297,6 +294,63 @@ module.exports = async function appTests() {
       assert.ok(swept.length > 0 && swept.every((n) => fridge.includes(n)), `swept: ${swept.join(', ')}`);
       await h.click('main .segmented button', 'Category');
       return `swept ${swept.length} fridge items`;
+    }],
+
+    ['#50 recipe units: slices of a loaf counted, tbsp of jam checked, editor offers only fitting units', async () => {
+      // Item editor shows the bread's recipe unit and size
+      await h.tab('Items');
+      await h.click('main button', 'Bread');
+      assert.equal(await page.$eval('#sheet select[name=packUnit]', (s) => s.value), 'slice');
+      assert.equal(await page.$eval('#sheet input[name=packSize]', (i) => i.value), '20');
+      assert.match(await page.$eval('#sheet [data-pack-summary]', (p) => p.textContent), /1 loaf = 20 slice/);
+      await h.shot('item-pack');
+      await page.keyboard.press('Escape');
+      await sleep(200);
+      // Recipe editor: bread row only offers loaf/slice
+      await h.tab('Recipes');
+      await h.click('main button', 'Cheese on toast');
+      assert.ok((await h.texts('#sheet .ing-list .qty')).some((t) => t.startsWith('2 slices')), 'view shows recipe unit');
+      await h.click('#sheet button', 'Edit');
+      const breadUnits = await page.evaluate(() => {
+        const row = [...document.querySelectorAll('#sheet .ing-row')].find((r) => r.querySelector('.ing-name').value === 'Bread');
+        return [...row.querySelectorAll('.ing-unit option')].map((o) => o.value);
+      });
+      assert.deepEqual(breadUnits, ['loaf', 'slice']);
+      await h.shot('recipe-units');
+      await page.keyboard.press('Escape');
+      await sleep(200);
+      // Plan cheese on toast: 2 slices of a 20-slice loaf
+      const before = (await h.state());
+      const breadId = before.items.find((i) => i.name === 'Bread').id;
+      const loaves = before.cupboard[breadId] || 0;
+      await h.tab('Week');
+      await h.click('main button', 'Add meal');
+      await page.select('#sheet select[name=recipe]', before.recipes.find((r) => r.name === 'Cheese on toast').id);
+      await h.click('#sheet button', 'Add to week');
+      await h.answerPlanning();
+      const after = await h.state();
+      assert.equal(after.cupboard[breadId] || 0, Math.round((loaves - 0.1) * 100) / 100, `bread ${loaves} → ${after.cupboard[breadId]}`);
+      // Plan pancakes with jam: asked whether there's jam, not counted
+      await h.click('main button', 'Add meal');
+      await page.select('#sheet select[name=recipe]', after.recipes.find((r) => r.name === 'Pancakes').id);
+      await h.click('#sheet button', 'Add to week');
+      await h.promptTitle();
+      await page.evaluate(() => [...document.querySelectorAll('#prompt .opt-list label')].find((l) => l.textContent.includes('jam')).querySelector('input').click());
+      await h.answer('Continue');
+      let sawJam = false;
+      for (let i = 0; i < 10; i++) {
+        const t = await h.promptTitle();
+        if (/ added$/.test(t)) break;
+        if (t === 'Have you got Strawberry jam?') {
+          sawJam = true;
+          assert.match(await page.$eval('#prompt p:not(.progress)', (p) => p.textContent), /1 tbsp.*jar/);
+          await h.shot('unsized-prompt');
+        }
+        await h.answer('Yes');
+      }
+      await h.answer('Done');
+      assert.ok(sawJam, 'asked about the jam');
+      return `bread ${loaves} → ${after.cupboard[breadId]} loaf`;
     }],
 
     ['#48 cupboard search', async () => {

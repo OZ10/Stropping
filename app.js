@@ -156,7 +156,10 @@
   // ---------- Formatting ----------
 
   // Built-in units that take a plural. Custom units are shown exactly as the household typed them.
-  const PLURAL = { pint: 'pints', clove: 'cloves', tin: 'tins', jar: 'jars', pack: 'packs', bottle: 'bottles', bunch: 'bunches', slice: 'slices', pinch: 'pinches' };
+  const PLURAL = {
+    pint: 'pints', clove: 'cloves', bulb: 'bulbs', tin: 'tins', jar: 'jars', pack: 'packs', box: 'boxes',
+    bottle: 'bottles', bunch: 'bunches', loaf: 'loaves', slice: 'slices', pinch: 'pinches',
+  };
   const num = (n) => String(L.round(n));
   function fmtQty(n, unit) {
     const v = num(n);
@@ -602,7 +605,7 @@
           text: 'Tick the ones you want for this meal. The rest are left out.',
           html: `<div class="opt-list">${q.options.map((o) => `<label class="check-line">
               <input type="checkbox" value="${esc(o.item.id)}">
-              <span><strong>${esc(o.item.name)}</strong>${o.item.multiUse ? '' : ` · ${esc(fmtQty(o.need, o.item.unit))}`}</span>
+              <span><strong>${esc(o.item.name)}</strong>${o.item.multiUse ? '' : ` · ${esc(fmtQty(o.need, o.unit))}`}</span>
             </label>`).join('')}</div>`,
           collect: (d) => $$('.opt-list input:checked', d).map((i) => i.value),
           buttons: [CANCEL, { label: 'Continue', value: 'ok', style: 'primary' }],
@@ -615,6 +618,14 @@
           title: `Have you got ${item.name}?`,
           text: `${item.name} is multi-use, so Stropping can’t tell how much is left. Is there enough for this meal?`,
           buttons: [CANCEL, { label: 'No, add to list', value: false }, { label: 'Yes', value: true, style: 'primary' }],
+        });
+      case 'unsized':
+        // A recipe unit Stropping can't count, e.g. tsp from a jar with no size given (#50).
+        return ask({
+          progress: `Planning ${q.meal.name}`,
+          title: `Have you got ${item.name}?`,
+          text: `This meal uses ${fmtQty(q.need, q.unit)}. Stropping doesn’t know how much is in a ${item.unit} of ${item.name}, so it can’t keep count. Is there enough?`,
+          buttons: [CANCEL, { label: `No, add a ${item.unit} to the list`, value: false }, { label: 'Yes', value: true, style: 'primary' }],
         });
       case 'frequent':
         return ask({
@@ -684,7 +695,7 @@
       const u = r.item.unit;
       if (r.status === 'have') return 'in the cupboard';
       if (r.status === 'on-list') return 'already on the list';
-      if (r.item.multiUse) return 'added to the list';
+      if (r.item.multiUse || r.inStockCheck) return 'added to the list';
       if (r.status === 'buy') return r.fromCupboard > L.EPS ? `${fmtQty(r.toShop, u)} to buy, ${fmtQty(r.fromCupboard, u)} from the cupboard` : `${fmtQty(r.toShop, u)} to buy`;
       return `${fmtQty(r.fromCupboard, u)} from the cupboard`;
     };
@@ -813,15 +824,17 @@
     const ingList = () => r.ingredients.map((g) => {
       const item = L.itemById(state, g.itemId);
       if (!item) return '';
-      const need = L.scaleQty(r, g.qty, portions);
+      const unit = g.unit || item.unit;
+      const need = L.scaleQty(r, g.qty, portions); // in the recipe's unit
+      const needItem = item.multiUse ? null : L.toItemUnit(item, need, unit); // in the item's unit, if countable
       const have = L.cupQty(state, item.id);
       let status;
-      if (item.multiUse) status = have ? '<span class="ok">In cupboard</span>' : '<span class="need">Not in cupboard</span>';
-      else if (have >= need - L.EPS) status = '<span class="ok">In cupboard</span>';
+      if (needItem == null) status = have ? '<span class="ok">In cupboard</span>' : '<span class="need">Not in cupboard</span>';
+      else if (have >= needItem - L.EPS) status = '<span class="ok">In cupboard</span>';
       else if (have > L.EPS) status = `<span class="need">Have ${esc(fmtQty(have, item.unit))}</span>`;
       else status = '<span class="need">To buy</span>';
       const opt = g.optional ? '<span class="opt-note">optional</span>' : '';
-      return `<li><span class="grow"><span class="title">${esc(item.name)}</span>${opt}${badges(item)}</span><span class="qty">${esc(fmtQty(need, item.unit))}${status}</span></li>`;
+      return `<li><span class="grow"><span class="title">${esc(item.name)}</span>${opt}${badges(item)}</span><span class="qty">${esc(fmtQty(need, unit))}${status}</span></li>`;
     }).join('');
     openSheet({
       title: r.name,
@@ -876,7 +889,7 @@
     const pickable = alphabetical([...state.labels, ...r.labels.filter((l) => !state.labels.includes(l))]);
     const rows = r.ingredients.map((g) => {
       const item = L.itemById(state, g.itemId);
-      return item ? ingRow(item.name, num(g.qty), item.unit, g.optional) : '';
+      return item ? ingRow(item.name, num(g.qty), g.unit || item.unit, g.optional) : '';
     }).join('') || ingRow();
     openSheet({
       title: id ? 'Edit recipe' : 'New recipe',
@@ -899,11 +912,23 @@
         ${itemsDatalist()}
         <div class="sheet-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save recipe</button></div>`,
       onMount: (d) => {
+        // Existing items offer only the units they can be measured in (#50):
+        // their own unit, its conversions, and their recipe unit if set.
         const sync = (row) => {
           const item = L.findItemByName(state, $('.ing-name', row).value);
           const sel = $('.ing-unit', row);
-          sel.disabled = !!item;
-          if (item) sel.value = item.unit;
+          const current = sel.value;
+          if (item) {
+            const allowed = alphabetical(L.unitsForItem(item));
+            sel.innerHTML = allowed.map((u) => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+            sel.value = allowed.includes(current) ? current : item.unit;
+            sel.disabled = allowed.length < 2;
+            sel.dataset.restricted = '1';
+          } else if (sel.dataset.restricted) {
+            sel.innerHTML = unitOptions(current);
+            sel.disabled = false;
+            delete sel.dataset.restricted;
+          }
         };
         $$('.ing-row', d).forEach(sync);
         const picker = $('[data-label-pick]', d);
@@ -948,11 +973,11 @@
           name: form.name.value.trim(),
           url,
           serves: Math.max(1, parseInt(form.serves.value, 10) || 1),
-          ingredients: rowsData.map((x) => ({
-            itemId: (L.findItemByName(state, x.name) || L.addItem(state, { name: x.name, unit: x.unit })).id,
-            qty: L.round(x.qty),
-            optional: x.optional,
-          })),
+          ingredients: rowsData.map((x) => {
+            const item = L.findItemByName(state, x.name) || L.addItem(state, { name: x.name, unit: x.unit });
+            // Store the recipe's unit only when it differs from the item's own (#50).
+            return { itemId: item.id, qty: L.round(x.qty), optional: x.optional, unit: x.unit === item.unit ? '' : x.unit };
+          }),
           instructions: form.instructions.value.replace(/\s+$/, '').slice(0, L.MAX_INSTRUCTIONS),
           labels: $$('[data-label-pick] [aria-pressed="true"]', form).map((b) => b.dataset.label),
         };
@@ -985,6 +1010,17 @@
           </label>
           <p class="hint">Filled in for you when you add this item to the shopping list or cupboard.</p>
         </div>
+        <fieldset class="pack" data-pack>
+          <legend>Smaller unit for recipes <em>optional</em></legend>
+          <p class="hint">For things you buy whole but use in parts, like a loaf used by the slice or a jar of jam used by the tsp.</p>
+          <div class="two">
+            <label class="field"><span>Recipes use</span><select name="packUnit" data-pack-unit></select></label>
+            <label class="field" data-pack-size><span>How many in 1 <em data-pack-of></em>?</span>
+              <input name="packSize" type="number" min="0" step="any" inputmode="decimal" placeholder="Not sure" value="${item.packSize > 0 ? num(item.packSize) : ''}">
+            </label>
+          </div>
+          <p class="hint" data-pack-summary></p>
+        </fieldset>
         <fieldset class="flags"><legend>Options</legend>
           ${flag('frequent', 'Frequently used', 'Also used outside recipes, like milk. Before it’s taken from the cupboard you’ll be asked whether it’s really still there.')}
           ${flag('shortLife', 'Short life', 'Goes off quickly, like chicken. If it isn’t used in a week, you’ll be asked to check it’s still in date.')}
@@ -1006,9 +1042,28 @@
           $('[data-default-unit]', d).textContent = `(${form.unit.value})`;
           $('.default-qty', d).hidden = form.multiUse.checked;
         };
-        form.unit.addEventListener('change', syncDefault);
-        form.multiUse.addEventListener('change', syncDefault);
+        // Smaller unit for recipes (#50): options exclude the item's own unit and its conversions.
+        let packSel = item.packUnit || '';
+        const syncPack = () => {
+          const unit = form.unit.value;
+          const choices = alphabetical(withCurrent(L.unitsFor(state), packSel)).filter((u) => !L.groupUnits(unit).includes(u));
+          if (!choices.includes(packSel)) packSel = '';
+          form.packUnit.innerHTML = `<option value="">None</option>${choices.map((u) => `<option value="${esc(u)}"${u === packSel ? ' selected' : ''}>${esc(u)}</option>`).join('')}`;
+          $('[data-pack-of]', d).textContent = unit;
+          $('[data-pack-size]', d).hidden = !packSel;
+          $('[data-pack]', d).hidden = form.multiUse.checked;
+          const size = parseFloat(form.packSize.value);
+          const usable = packSel ? alphabetical([...new Set([...L.groupUnits(unit), ...L.groupUnits(packSel)])]).join(', ') : '';
+          $('[data-pack-summary]', d).textContent = !packSel ? ''
+            : size > 0 ? `1 ${unit} = ${fmtQty(size, packSel)}. Recipes can use ${usable}, and Stropping counts what’s used.`
+              : `Without a size, Stropping can’t count how much ${packSel} is used, so it will ask whether you have ${form.name.value.trim() || 'it'} instead. Recipes can use ${usable}.`;
+        };
+        form.unit.addEventListener('change', () => { syncDefault(); syncPack(); });
+        form.multiUse.addEventListener('change', () => { syncDefault(); syncPack(); });
+        form.packUnit.addEventListener('change', () => { packSel = form.packUnit.value; syncPack(); });
+        form.packSize.addEventListener('input', syncPack);
         syncDefault();
+        syncPack();
         const del = $('[data-del]', d);
         if (del) del.addEventListener('click', async () => {
           const used = L.itemUsage(state, id);
@@ -1036,7 +1091,10 @@
           defaultQty: parseFloat(form.defaultQty.value) > 0 ? L.round(parseFloat(form.defaultQty.value)) : 0,
           frequentBuy: form.frequentBuy.checked,
           location: form.location.value,
+          packUnit: form.packUnit.value !== form.unit.value ? form.packUnit.value : '',
+          packSize: 0,
         };
+        if (data.packUnit) data.packSize = parseFloat(form.packSize.value) > 0 ? L.round(parseFloat(form.packSize.value)) : 0;
         const existing = L.itemById(state, id);
         if (existing) {
           Object.assign(existing, data);
