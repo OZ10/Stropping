@@ -9,7 +9,7 @@
  * State shape:
  *   items:    [{ id, name, unit, category, frequent, shortLife, multiUse }]
  *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty }], instructions, labels: [name] }]
- *   labels:   [name]  household's recipe labels, in display order
+ *   labels:   [name]  household's recipe labels (always shown alphabetically)
  *   cupboard: { [itemId]: qty }            multi-use items: 1 = in stock
  *   shopping: [{ id, itemId, qty, reserved, done, added }]
  *             reserved = amount already promised to planned meals
@@ -202,7 +202,6 @@
     for (const r of s.recipes) r.labels = r.labels.filter((l) => l !== name);
   }
 
-  const moveLabel = (s, name, delta) => moveInList(s.labels, name, delta);
   const labelUsage = (s, name) => s.recipes.filter((r) => r.labels.includes(name));
 
   /** Recipes that have ALL of the selected labels (all recipes when none are selected). */
@@ -739,7 +738,7 @@
     UNITS, CATEGORIES, FALLBACK_CATEGORY, MAX_UNIT_NAME, MAX_CATEGORY_NAME, EPS, MAX_INSTRUCTIONS, uid,
     unitsFor, categoriesFor, addUnit, removeUnit, unitUsage,
     addCategory, renameCategory, removeCategory, moveCategory, categoryUsage,
-    DEFAULT_LABELS, MAX_LABEL_NAME, addLabel, renameLabel, removeLabel, moveLabel, labelUsage, recipesWithLabels, round, today, emptyState, normalise, sampleState,
+    DEFAULT_LABELS, MAX_LABEL_NAME, addLabel, renameLabel, removeLabel, labelUsage, recipesWithLabels, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit, suggestedQty,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,

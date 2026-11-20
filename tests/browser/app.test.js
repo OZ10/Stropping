@@ -171,6 +171,40 @@ module.exports = async function appTests() {
       await h.click('#sheet button', 'Cancel');
     }],
 
+    ['#47 pick-lists are A–Z; shopping groups keep the household order', async () => {
+      const isAlpha = (list) => list.every((v, i) => i === 0 || list[i - 1].localeCompare(v, undefined, { sensitivity: 'base' }) <= 0);
+      await h.tab('Items');
+      await h.click('main button', 'Onion');
+      const cats = await h.texts('#sheet select[name=category] option');
+      assert.equal(cats[cats.length - 1], 'Other', 'Other last');
+      assert.ok(isAlpha(cats.slice(0, -1)), `categories A–Z: ${cats.join(', ')}`);
+      const units = await h.texts('#sheet select[name=unit] option');
+      assert.ok(isAlpha(units) && units.includes('punnet'), `units A–Z: ${units.join(', ')}`);
+      await page.keyboard.press('Escape');
+      await sleep(200);
+      await h.click('main button', '+ New item');
+      const suggestions = await page.$$eval('#items-dl option', (os) => os.map((o) => o.value));
+      assert.ok(isAlpha(suggestions), 'item suggestions A–Z');
+      await page.keyboard.press('Escape');
+      await sleep(200);
+      await h.tab('Recipes');
+      const pressed = await page.$$eval('main .chips.filter .chip[aria-pressed="true"]', (cs) => cs.map((c) => c.textContent.trim()));
+      const stored = await page.evaluate(() => localStorage.getItem('stropping:recipeFilter'));
+      const filters = await h.texts('main .chips.filter .chip[data-label]');
+      assert.ok(isAlpha(filters), `label filters A–Z: ${filters.join(', ')}`);
+      assert.deepEqual(pressed, [], `no filter left on (pressed: ${pressed.join(', ')}; stored: ${stored})`);
+      await h.click('main button', 'Labels');
+      assert.ok(isAlpha(await page.$$eval('#sheet [data-entry]', (es) => es.map((e) => e.dataset.entry))), 'Labels screen A–Z');
+      assert.equal(await page.$$eval('#sheet [data-entry-act="up"]', (b) => b.length), 0, 'no reordering for labels');
+      await h.click('#sheet button', 'Done');
+      await h.tab('Shopping');
+      const groups = await h.texts('main .group h3');
+      const order = (await h.state()).settings.categories;
+      const expected = order.filter((c) => groups.map((g) => g.toLowerCase()).includes(c.toLowerCase()));
+      assert.deepEqual(groups.map((g) => g.toLowerCase()), expected.map((c) => c.toLowerCase()), 'shopping groups follow the household order');
+      return `groups: ${groups.join(' > ')}`;
+    }],
+
     ['#48 cupboard search', async () => {
       await h.tab('Cupboard');
       await h.setValue('#view [data-search]', 'rice');

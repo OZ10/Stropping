@@ -200,12 +200,16 @@
     return cats.map((c) => [c, groups.get(c).sort((a, b) => a.item.name.localeCompare(b.item.name))]);
   }
 
+  // Lists you pick from are alphabetical (#47). The shopping list and cupboard
+  // groups keep the household's own category order (see byCategory).
+  const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  const alphabetical = (list, last) => [...list.filter((x) => x !== last).sort(byName), ...(list.includes(last) ? [last] : [])];
   const withCurrent = (list, sel) => (sel && !list.includes(sel) ? [...list, sel] : list);
-  const unitOptions = (sel) => withCurrent(L.unitsFor(state), sel)
+  const unitOptions = (sel) => alphabetical(withCurrent(L.unitsFor(state), sel))
     .map((u) => `<option value="${esc(u)}"${u === sel ? ' selected' : ''}>${esc(u)}</option>`).join('');
-  const catOptions = (sel) => withCurrent(L.categoriesFor(state), sel)
+  const catOptions = (sel) => alphabetical(withCurrent(L.categoriesFor(state), sel), L.FALLBACK_CATEGORY)
     .map((c) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
-  const itemsDatalist = () => `<datalist id="items-dl">${state.items.map((i) => `<option value="${esc(i.name)}">`).join('')}</datalist>`;
+  const itemsDatalist = () => `<datalist id="items-dl">${alphabetical(state.items.map((i) => i.name)).map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`;
 
   function empty(text, extra = '') {
     return `<div class="empty"><p>${esc(text)}</p>${extra}</div>`;
@@ -285,11 +289,8 @@
 
   // ---------- Recipe labels (#45) ----------
 
-  /** Labels used by at least one recipe, in the household's order (plus any stray ones). */
-  function labelsInUse() {
-    const used = new Set(state.recipes.flatMap((r) => r.labels));
-    return [...state.labels.filter((l) => used.has(l)), ...[...used].filter((l) => !state.labels.includes(l)).sort()];
-  }
+  /** Labels used by at least one recipe, alphabetically. */
+  const labelsInUse = () => alphabetical([...new Set(state.recipes.flatMap((r) => r.labels))]);
 
   /** Toggle buttons for filtering recipes by label. */
   function labelFilterHtml(selected) {
@@ -803,7 +804,7 @@
   function editRecipe(id) {
     const r = state.recipes.find((x) => x.id === id) || { name: '', url: '', serves: 4, ingredients: [], instructions: '', labels: [] };
     // Household labels, plus any this recipe has that were since removed from the list.
-    const pickable = [...state.labels, ...r.labels.filter((l) => !state.labels.includes(l))];
+    const pickable = alphabetical([...state.labels, ...r.labels.filter((l) => !state.labels.includes(l))]);
     const rows = r.ingredients.map((g) => {
       const item = L.itemById(state, g.itemId);
       return item ? ingRow(item.name, num(g.qty), item.unit) : '';
@@ -982,6 +983,7 @@
     key: 'categories',
     noun: 'category',
     maxLen: L.MAX_CATEGORY_NAME,
+    reorderable: true, // the order is the shopping list's aisle order
     names: () => L.categoriesFor(state),
     fixed: L.FALLBACK_CATEGORY,
     usage: (n) => plural(L.categoryUsage(state, n).length, 'item'),
@@ -999,11 +1001,11 @@
     key: 'labels',
     noun: 'label',
     maxLen: L.MAX_LABEL_NAME,
-    names: () => state.labels,
+    reorderable: false, // always shown alphabetically
+    names: () => alphabetical(state.labels),
     fixed: null,
     usage: (n) => plural(L.labelUsage(state, n).length, 'recipe'),
     add: (n) => L.addLabel(state, n),
-    move: (n, delta) => L.moveLabel(state, n, delta),
     rename: (from, to) => L.renameLabel(state, from, to),
     remove: (n) => L.removeLabel(state, n),
     removeText: (n) => {
@@ -1019,8 +1021,8 @@
       const fixed = name === list.fixed;
       return `<li data-entry="${esc(name)}">
         <span class="grow"><span class="title">${esc(name)}</span><span class="sub">${list.usage(name)}${fixed ? ' · always kept' : ''}</span></span>
-        <button type="button" class="icon-btn" data-entry-act="up"${n === 0 ? ' disabled' : ''} aria-label="Move ${esc(name)} up">↑</button>
-        <button type="button" class="icon-btn" data-entry-act="down"${n === names.length - 1 ? ' disabled' : ''} aria-label="Move ${esc(name)} down">↓</button>
+        ${list.reorderable ? `<button type="button" class="icon-btn" data-entry-act="up"${n === 0 ? ' disabled' : ''} aria-label="Move ${esc(name)} up">↑</button>
+        <button type="button" class="icon-btn" data-entry-act="down"${n === names.length - 1 ? ' disabled' : ''} aria-label="Move ${esc(name)} down">↓</button>` : ''}
         ${fixed ? '<span class="icon-spacer"></span><span class="icon-spacer"></span>'
           : `<button type="button" class="icon-btn" data-entry-act="rename" aria-label="Rename ${esc(name)}">✎</button>
              <button type="button" class="icon-btn" data-entry-act="delete" aria-label="Delete ${esc(name)}">${ICON.x}</button>`}
@@ -1064,7 +1066,7 @@
     if (!btn) return false;
     const name = btn.closest('[data-entry]').dataset.entry;
     const act = btn.dataset.entryAct;
-    if (act === 'up' || act === 'down') attemptEdit(() => list.move(name, act === 'up' ? -1 : 1), refresh);
+    if ((act === 'up' || act === 'down') && list.reorderable) attemptEdit(() => list.move(name, act === 'up' ? -1 : 1), refresh);
     if (act === 'rename') {
       attemptEdit(async () => {
         const res = await ask({
@@ -1088,7 +1090,7 @@
   // ---------- Units & categories (#39, #42) ----------
 
   function listsHtml() {
-    const custom = state.settings.customUnits;
+    const custom = [...state.settings.customUnits].sort((a, b) => byName(a.name, b.name));
     const unitRows = custom.map((u) => `<li data-unit="${esc(u.name)}">
         <span class="grow"><span class="title">${esc(u.name)}</span><span class="sub">${u.count ? 'Whole numbers' : 'Measured'} · ${plural(L.unitUsage(state, u.name).length, 'item')}</span></span>
         <button type="button" class="icon-btn" data-unit-act="delete" aria-label="Delete ${esc(u.name)}">${ICON.x}</button>
@@ -1101,7 +1103,7 @@
       </section>
       <section class="settings-block">
         <h3>Units</h3>
-        <p class="hint">Built in: ${esc(L.UNITS.join(', '))}.</p>
+        <p class="hint">Built in: ${esc(alphabetical(L.UNITS).join(', '))}.</p>
         ${custom.length ? `<ul class="rows edit-list">${unitRows}</ul>` : ''}
         <div class="add-row">
           <input data-new-unit maxlength="${L.MAX_UNIT_NAME}" placeholder="New unit, e.g. punnet" aria-label="New unit name" autocomplete="off">
@@ -1566,7 +1568,10 @@
     const tabBtn = e.target.closest('.tabbar [data-tab]');
     if (tabBtn) { go(tabBtn.dataset.tab); return; }
     const el = e.target.closest('[data-act]');
-    if (!el || el.tagName === 'INPUT' || el.closest('dialog')) return;
+    // Dialogs handle their own clicks. Use the event path, not el.closest(), because
+    // a dialog may have re-rendered and detached the clicked element already.
+    const inDialog = e.composedPath().some((n) => n.tagName === 'DIALOG');
+    if (!el || el.tagName === 'INPUT' || inDialog) return;
     const fn = ACTIONS[el.dataset.act];
     if (fn) fn(el.dataset.id, el);
   });
