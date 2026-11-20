@@ -10,6 +10,7 @@
  *   items:    [{ id, name, unit, category, frequent, shortLife, multiUse }]
  *   recipes:  [{ id, name, url, serves, ingredients: [{ itemId, qty, optional }], instructions, labels: [name] }]
  *   labels:   [name]  household's recipe labels (always shown alphabetically)
+ *   locations: [name] where items are kept (Fridge, Pantry…); items[].location ('' = not set)
  *   cupboard: { [itemId]: qty }            multi-use items: 1 = in stock
  *   shopping: [{ id, itemId, qty, reserved, done, added }]
  *             reserved = amount already promised to planned meals
@@ -39,6 +40,10 @@
   const MAX_LABELS = 50; // household label list (also in firestore.rules)
   const MAX_LABEL_NAME = 30;
   const MAX_RECIPE_LABELS = 20; // labels on one recipe (also in firestore.rules)
+  // Item locations (#46): household list (own sync doc, meta/locations). '' = not set.
+  const DEFAULT_LOCATIONS = ['Fridge', 'Freezer', 'Pantry', 'Tall cupboard'];
+  const MAX_LOCATIONS = 50; // also in firestore.rules
+  const MAX_LOCATION_NAME = 50;
   const EPS = 1e-6;
 
   const MAX_INSTRUCTIONS = 20000; // also enforced in firestore.rules
@@ -100,11 +105,13 @@
 
   const cleanLabels = (raw) => (Array.isArray(raw) ? cleanNameList(raw, MAX_LABELS, MAX_LABEL_NAME) : [...DEFAULT_LABELS]);
   const cleanRecipeLabels = (raw) => cleanNameList(raw, MAX_RECIPE_LABELS, MAX_LABEL_NAME);
+  const cleanLocations = (raw) => (Array.isArray(raw) ? cleanNameList(raw, MAX_LOCATIONS, MAX_LOCATION_NAME) : [...DEFAULT_LOCATIONS]);
+  const cleanItemLocation = (v) => (typeof v === 'string' ? v.trim().slice(0, MAX_LOCATION_NAME) : '');
 
   function emptyState() {
     return {
       version: 1, items: [], recipes: [], cupboard: {}, shopping: [], week: newWeek(), lastWeek: null,
-      settings: defaultSettings(), labels: [...DEFAULT_LABELS],
+      settings: defaultSettings(), labels: [...DEFAULT_LABELS], locations: [...DEFAULT_LOCATIONS],
     };
   }
 
@@ -206,6 +213,33 @@
 
   const labelUsage = (s, name) => s.recipes.filter((r) => r.labels.includes(name));
 
+  // ---------- Item locations (#46) ----------
+
+  const checkLocationName = (s, name, except) => checkListName(s.locations, name, { noun: 'location', maxLen: MAX_LOCATION_NAME, except });
+
+  function addLocation(s, name) {
+    const n = checkLocationName(s, name);
+    if (s.locations.length >= MAX_LOCATIONS) throw new Error(`You can have up to ${MAX_LOCATIONS} locations.`);
+    s.locations.push(n);
+    return n;
+  }
+
+  /** Rename a location and move its items with it. */
+  function renameLocation(s, from, to) {
+    const n = checkLocationName(s, to, from);
+    s.locations = s.locations.map((l) => (l === from ? n : l));
+    for (const i of s.items) if (i.location === from) i.location = n;
+    return n;
+  }
+
+  /** Delete a location; its items become "not set". */
+  function removeLocation(s, name) {
+    s.locations = s.locations.filter((l) => l !== name);
+    for (const i of s.items) if (i.location === name) i.location = '';
+  }
+
+  const locationUsage = (s, name) => s.items.filter((i) => i.location === name);
+
   /** Recipes that have ALL of the selected labels (all recipes when none are selected). */
   const recipesWithLabels = (s, selected) => s.recipes.filter((r) => selected.every((l) => r.labels.includes(l)));
 
@@ -217,6 +251,7 @@
     const s = emptyState();
     s.settings = cleanSettings(raw.settings);
     s.labels = cleanLabels(raw.labels);
+    s.locations = cleanLocations(raw.locations);
     s.items = raw.items.filter((i) => i && i.id && i.name).map((i) => ({
       id: String(i.id),
       name: String(i.name),
@@ -227,6 +262,7 @@
       multiUse: !!i.multiUse,
       defaultQty: cleanDefault(i.defaultQty),
       frequentBuy: !!i.frequentBuy,
+      location: cleanItemLocation(i.location),
     }));
     const ids = new Set(s.items.map((i) => i.id));
     s.recipes = raw.recipes.filter((r) => r && r.id && r.name).map((r) => ({
@@ -274,7 +310,7 @@
     return n ? s.items.find((i) => i.name.toLowerCase() === n) : undefined;
   };
 
-  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false, defaultQty = 0, frequentBuy = false }) {
+  function addItem(s, { name, unit = 'each', category = 'Other', frequent = false, shortLife = false, multiUse = false, defaultQty = 0, frequentBuy = false, location = '' }) {
     const existing = findItemByName(s, name);
     if (existing) return existing;
     const item = {
@@ -284,6 +320,7 @@
       frequent: !!frequent, shortLife: !!shortLife, multiUse: !!multiUse,
       defaultQty: cleanDefault(defaultQty),
       frequentBuy: !!frequentBuy,
+      location: s.locations.includes(location) ? location : '',
     };
     s.items.push(item);
     return item;
@@ -572,14 +609,15 @@
   }
 
   /**
-   * Go through every cupboard item and confirm it's still there.
+   * Go through cupboard items and confirm they're still there. Pass { location }
+   * to sweep just one location ('' = items with no location set).
    * ask() answers: { action: 'keep', qty? } | { action: 'gone', addToList } | null (stop, keep progress).
    */
-  async function sweep(state, ask) {
+  async function sweep(state, ask, { location } = {}) {
     const s = clone(state);
     const items = Object.keys(s.cupboard)
       .map((id) => itemById(s, id))
-      .filter(Boolean)
+      .filter((item) => item && (location === undefined || item.location === location))
       .sort((a, b) => categoriesFor(s).indexOf(a.category) - categoriesFor(s).indexOf(b.category) || a.name.localeCompare(b.name));
     let reviewed = 0;
     let removed = 0;
@@ -626,6 +664,12 @@
       kitchenRoll: add('Kitchen roll', 'pack', 'Household', { frequentBuy: true }),
       bread: add('Bread', 'each', 'Bakery', { frequentBuy: true }),
     };
+    const where = {
+      Fridge: [i.chicken, i.mince, i.spinach, i.milk, i.eggs, i.butter, i.cheddar],
+      Pantry: [i.onion, i.garlic, i.tomatoes, i.coconut, i.rice, i.pasta, i.flour, i.bread],
+      'Tall cupboard': [i.cumin, i.paprika, i.oil, i.kitchenRoll],
+    };
+    for (const [loc, list] of Object.entries(where)) for (const itemId of list) itemById(s, itemId).location = loc;
     const recipe = (name, serves, labels, list, instructions = '') => s.recipes.push({
       id: uid(), name, url: '', serves, ingredients: list.map(([itemId, qty, opt]) => ({ itemId, qty, optional: opt === 'optional' })), instructions, labels,
     });
@@ -650,7 +694,7 @@
   // For sharing, state is stored as one small document per entity so that two
   // people editing different things never overwrite each other. Paths:
   //   items/{id}  recipes/{id}  shopping/{id}  cupboard/{itemId}  meals/{id}
-  //   meta/week  meta/settings  meta/labels
+  //   meta/week  meta/settings  meta/labels  meta/locations
 
   const SYNC_COLLECTIONS = ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
 
@@ -674,6 +718,7 @@
     d.set('meta/settings', clone(s.settings));
     // Separate from settings so an older app version saving settings can't drop the labels.
     d.set('meta/labels', { labels: [...s.labels] });
+    d.set('meta/locations', { locations: [...s.locations] });
     return d;
   }
 
@@ -697,6 +742,7 @@
           frequent: !!data.frequent, shortLife: !!data.shortLife, multiUse: !!data.multiUse,
           defaultQty: cleanDefault(data.defaultQty),
           frequentBuy: !!data.frequentBuy,
+          location: cleanItemLocation(data.location),
         });
       } else if (coll === 'recipes') {
         s.recipes.push({
@@ -723,6 +769,8 @@
         s.settings = cleanSettings(data);
       } else if (coll === 'meta' && id === 'labels') {
         s.labels = cleanLabels(data.labels);
+      } else if (coll === 'meta' && id === 'locations') {
+        s.locations = cleanLocations(data.locations);
       }
     }
     s.week.meals.sort((a, b) => a.at - b.at);
@@ -756,7 +804,8 @@
     UNITS, CATEGORIES, FALLBACK_CATEGORY, MAX_UNIT_NAME, MAX_CATEGORY_NAME, EPS, MAX_INSTRUCTIONS, uid,
     unitsFor, categoriesFor, addUnit, removeUnit, unitUsage,
     addCategory, renameCategory, removeCategory, moveCategory, categoryUsage,
-    DEFAULT_LABELS, MAX_LABEL_NAME, addLabel, renameLabel, removeLabel, labelUsage, recipesWithLabels, round, today, emptyState, normalise, sampleState,
+    DEFAULT_LABELS, MAX_LABEL_NAME, addLabel, renameLabel, removeLabel, labelUsage, recipesWithLabels,
+    DEFAULT_LOCATIONS, MAX_LOCATION_NAME, addLocation, renameLocation, removeLocation, locationUsage, round, today, emptyState, normalise, sampleState,
     itemById, findItemByName, addItem, itemUsage, deleteItem, isCountUnit, suggestedQty,
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,

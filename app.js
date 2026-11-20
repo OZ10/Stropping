@@ -204,11 +204,29 @@
   // groups keep the household's own category order (see byCategory).
   const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   const alphabetical = (list, last) => [...list.filter((x) => x !== last).sort(byName), ...(list.includes(last) ? [last] : [])];
+  /** Group [{item,...}] rows by location, A–Z, with "not set" ('') last. */
+  function byLocation(rows) {
+    const groups = new Map();
+    for (const row of rows) {
+      const loc = row.item.location || '';
+      if (!groups.has(loc)) groups.set(loc, []);
+      groups.get(loc).push(row);
+    }
+    return alphabetical([...groups.keys()], '').map((l) => [l, groups.get(l).sort((a, b) => byName(a.item.name, b.item.name))]);
+  }
+
+  // Cupboard grouping (category or location), remembered on this device.
+  const CUP_GROUP_KEY = 'stropping:cupGroup';
+  let cupGroup = 'category';
+  try { cupGroup = localStorage.getItem(CUP_GROUP_KEY) === 'location' ? 'location' : 'category'; } catch (e) { /* ignore */ }
+
   const withCurrent = (list, sel) => (sel && !list.includes(sel) ? [...list, sel] : list);
   const unitOptions = (sel) => alphabetical(withCurrent(L.unitsFor(state), sel))
     .map((u) => `<option value="${esc(u)}"${u === sel ? ' selected' : ''}>${esc(u)}</option>`).join('');
   const catOptions = (sel) => alphabetical(withCurrent(L.categoriesFor(state), sel), L.FALLBACK_CATEGORY)
     .map((c) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const locOptions = (sel) => `<option value="">Not set</option>${alphabetical(withCurrent(state.locations, sel))
+    .map((l) => `<option value="${esc(l)}"${l === sel ? ' selected' : ''}>${esc(l)}</option>`).join('')}`;
   const itemsDatalist = () => `<datalist id="items-dl">${alphabetical(state.items.map((i) => i.name)).map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`;
 
   function empty(text, extra = '') {
@@ -379,13 +397,24 @@
           <button class="btn primary" data-act="add-cupboard">+ Add</button>
         </div>
       </div>
-      ${rows.length ? searchBox('Search the cupboard') : ''}
-      ${rows.length ? byCategory(rows).map(([cat, list]) => `
-        <section class="group" data-group><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ item, qty }) => `
-          <li data-search-text="${esc(`${item.name} ${item.category}`.toLowerCase())}"><button class="row-main" data-act="edit-cupboard" data-id="${item.id}">
-            <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span>
+      ${rows.length ? `<div class="toolbar">
+        <div class="segmented" role="group" aria-label="Group by">
+          <span>Group by</span>
+          <button type="button" data-act="cup-group" data-by="category" aria-pressed="${cupGroup === 'category'}">Category</button>
+          <button type="button" data-act="cup-group" data-by="location" aria-pressed="${cupGroup === 'location'}">Location</button>
+        </div>
+        ${searchBox('Search the cupboard')}
+      </div>` : ''}
+      ${rows.length ? (cupGroup === 'location' ? byLocation(rows) : byCategory(rows)).map(([group, list]) => `
+        <section class="group" data-group><h3>${esc(group || 'No location')}</h3><ul class="rows">${list.map(({ item, qty }) => {
+          // Show the other grouping as a hint on each row.
+          const other = cupGroup === 'location' ? item.category : item.location;
+          return `
+          <li data-search-text="${esc(`${item.name} ${item.category} ${item.location}`.toLowerCase())}"><button class="row-main" data-act="edit-cupboard" data-id="${item.id}">
+            <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}${other ? `<span class="sub">${esc(other)}</span>` : ''}</span>
             <span class="qty">${esc(itemQty(item, qty))}</span>
-          </button></li>`).join('')}</ul></section>`).join('')
+          </button></li>`;
+        }).join('')}</ul></section>`).join('')
         : empty('The cupboard is empty. Add what you have in stock, or tick things off the shopping list and they’ll be added here.')}
       <p class="hint empty-search" hidden>Nothing in the cupboard matches.</p>
       ${rows.length ? '<p class="hint">Sweep goes through each item so you can confirm it’s still there.</p>' : ''}`;
@@ -424,7 +453,7 @@
       <div class="head">
         <div><h2>Items</h2><p class="sub">Ingredients and household items</p></div>
         <div class="row-btns">
-          <button class="btn" data-act="lists">Units &amp; categories</button>
+          <button class="btn" data-act="lists" title="Categories, locations and units">Item settings</button>
           <button class="btn primary" data-act="new-item">+ New item</button>
         </div>
       </div>
@@ -704,10 +733,30 @@
 
   async function sweepFlow() {
     if (!Object.keys(state.cupboard).length) { toast('The cupboard is empty.'); return; }
+    // With locations in use, offer to sweep one place at a time (#46).
+    const stocked = Object.keys(state.cupboard).map((id) => L.itemById(state, id)).filter(Boolean);
+    const locs = alphabetical([...new Set(stocked.map((i) => i.location || ''))], '');
+    let opts = {};
+    if (locs.some((l) => l)) {
+      const count = (l) => stocked.filter((i) => (i.location || '') === l).length;
+      const choice = await ask({
+        title: 'Sweep which location?',
+        text: 'Check everything, or just one place at a time.',
+        stack: true,
+        buttons: [
+          { label: `Everything (${stocked.length})`, value: '*', style: 'primary' },
+          ...locs.map((l) => ({ label: `${l || 'No location'} (${count(l)})`, value: l })),
+          { label: 'Cancel', value: null, style: 'quiet' },
+        ],
+      });
+      if (choice == null) return;
+      if (choice !== '*') opts = { location: choice };
+    }
     const base = state;
-    const res = await L.sweep(base, flowAsk);
+    const res = await L.sweep(base, flowAsk, opts);
     commit(res.state, base);
-    toast(`Checked ${res.reviewed} of ${plural(res.total, 'item')}${res.removed ? `, ${res.removed} removed` : ''}.`);
+    const where = 'location' in opts ? ` in ${opts.location || 'items with no location'}` : '';
+    toast(`Checked ${res.reviewed} of ${plural(res.total, 'item')}${where}${res.removed ? `, ${res.removed} removed` : ''}.`);
   }
 
   // ---------- Sheets ----------
@@ -918,7 +967,7 @@
   }
 
   function editItem(id) {
-    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false, defaultQty: 0, frequentBuy: false };
+    const item = L.itemById(state, id) || { name: '', unit: 'each', category: 'Other', frequent: false, shortLife: false, multiUse: false, defaultQty: 0, frequentBuy: false, location: '' };
     const flag = (name, title, desc) => `<label class="toggle"><input type="checkbox" name="${name}"${item[name] ? ' checked' : ''}>
       <span><strong>${title}</strong><small>${desc}</small></span></label>`;
     openSheet({
@@ -929,6 +978,7 @@
           <label class="field"><span>Unit</span><select name="unit">${unitOptions(item.unit)}</select></label>
           <label class="field"><span>Category</span><select name="category">${catOptions(item.category)}</select></label>
         </div>
+        <label class="field"><span>Location</span><select name="location">${locOptions(item.location)}</select></label>
         <div class="default-qty">
           <label class="field"><span>Default amount <em data-default-unit>(${esc(item.unit)})</em></span>
             <input name="defaultQty" type="number" min="0" step="any" inputmode="decimal" placeholder="None" value="${item.defaultQty > 0 ? num(item.defaultQty) : ''}">
@@ -985,6 +1035,7 @@
           frequent: form.frequent.checked, shortLife: form.shortLife.checked, multiUse: form.multiUse.checked,
           defaultQty: parseFloat(form.defaultQty.value) > 0 ? L.round(parseFloat(form.defaultQty.value)) : 0,
           frequentBuy: form.frequentBuy.checked,
+          location: form.location.value,
         };
         const existing = L.itemById(state, id);
         if (existing) {
@@ -1033,6 +1084,23 @@
     removeText: (n) => {
       const k = L.labelUsage(state, n).length;
       return k ? `It will be taken off ${plural(k, 'recipe')}.` : 'No recipes use it.';
+    },
+  };
+
+  const LOCATION_LIST = {
+    key: 'locations',
+    noun: 'location',
+    maxLen: L.MAX_LOCATION_NAME,
+    reorderable: false, // always shown alphabetically
+    names: () => alphabetical(state.locations),
+    fixed: null,
+    usage: (n) => plural(L.locationUsage(state, n).length, 'item'),
+    add: (n) => L.addLocation(state, n),
+    rename: (from, to) => L.renameLocation(state, from, to),
+    remove: (n) => L.removeLocation(state, n),
+    removeText: (n) => {
+      const k = L.locationUsage(state, n).length;
+      return k ? `Its ${plural(k, 'item')} will have no location.` : 'No items use it.';
     },
   };
 
@@ -1109,7 +1177,7 @@
     return true;
   }
 
-  // ---------- Units & categories (#39, #42) ----------
+  // ---------- Item settings: categories (#39), locations (#46), units (#42) ----------
 
   function listsHtml() {
     const custom = [...state.settings.customUnits].sort((a, b) => byName(a.name, b.name));
@@ -1122,6 +1190,11 @@
         <h3>Categories</h3>
         <p class="hint">The shopping list and cupboard are grouped in this order.</p>
         ${orderedListHtml(CATEGORY_LIST, 'New category')}
+      </section>
+      <section class="settings-block">
+        <h3>Locations</h3>
+        <p class="hint">Where things are kept. The cupboard can be grouped and swept by location.</p>
+        ${orderedListHtml(LOCATION_LIST, 'New location, e.g. Garage')}
       </section>
       <section class="settings-block">
         <h3>Units</h3>
@@ -1139,7 +1212,7 @@
 
   function listsSheet() {
     openSheet({
-      title: 'Units & categories',
+      title: 'Item settings',
       autofocus: false,
       html: `<div class="lists" data-lists>${listsHtml()}</div>`,
       onSubmit: () => false, // pressing Enter in a box shouldn't close the sheet
@@ -1149,12 +1222,13 @@
         const addUnit = () => attemptEdit(() => {
           L.addUnit(state, $('[data-new-unit]', box).value, $('[data-new-unit-count]', box).checked);
         }, refresh);
+        const lists = [CATEGORY_LIST, LOCATION_LIST];
         box.addEventListener('keydown', (e) => {
-          if (handleOrderedListEvent(e, box, [CATEGORY_LIST], refresh)) return;
+          if (handleOrderedListEvent(e, box, lists, refresh)) return;
           if (e.key === 'Enter' && e.target.matches('[data-new-unit]')) { e.preventDefault(); addUnit(); }
         });
         box.addEventListener('click', (e) => {
-          if (handleOrderedListEvent(e, box, [CATEGORY_LIST], refresh)) return;
+          if (handleOrderedListEvent(e, box, lists, refresh)) return;
           if (e.target.closest('[data-add-unit]')) { addUnit(); return; }
           const unitBtn = e.target.closest('[data-unit-act]');
           if (unitBtn) attemptEdit(() => L.removeUnit(state, unitBtn.closest('[data-unit]').dataset.unit), refresh);
@@ -1173,6 +1247,7 @@
           <label class="field"><span>Unit</span><select name="unit">${unitOptions('each')}</select></label>
           <label class="field"><span>Category</span><select name="category">${catOptions('Other')}</select></label>
         </div>
+        <label class="field"><span>Location</span><select name="location">${locOptions('')}</select></label>
       </div>
       <label class="field qty-field"><span>${esc(qtyLabel)} <em data-unit></em></span><input name="qty" type="number" min="0" step="any" inputmode="decimal" required></label>
       ${itemsDatalist()}`;
@@ -1201,7 +1276,8 @@
 
   function resolvePicked(form) {
     const name = form.item.value.trim();
-    const item = L.findItemByName(state, name) || L.addItem(state, { name, unit: form.unit.value, category: form.category.value });
+    const item = L.findItemByName(state, name)
+      || L.addItem(state, { name, unit: form.unit.value, category: form.category.value, location: form.location.value });
     return { item, qty: item.multiUse ? 1 : parseFloat(form.qty.value) };
   }
 
@@ -1562,6 +1638,11 @@
     'new-item': () => editItem(null),
     lists: listsSheet,
     labels: labelsSheet,
+    'cup-group': (_, el) => {
+      cupGroup = el.dataset.by === 'location' ? 'location' : 'category';
+      try { localStorage.setItem(CUP_GROUP_KEY, cupGroup); } catch (e) { /* ignore */ }
+      render();
+    },
     'filter-label': (_, el) => setRecipeFilter(toggleIn(recipeFilter.filter((l) => labelsInUse().includes(l)), el.dataset.label)),
     'filter-clear': () => setRecipeFilter([]),
     'edit-item': editItem,

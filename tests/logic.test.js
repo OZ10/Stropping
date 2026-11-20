@@ -299,6 +299,34 @@ test('#45 labels: filter, rename/delete cascade, own sync doc', () => {
   assert.deepEqual(rl, ['Fast', '7', 'Oven']);
 });
 
+test('#46 locations: assign, rename/delete cascade, sweep one location, own sync doc', async () => {
+  const s = L.sampleState();
+  assert.deepEqual(s.locations, L.DEFAULT_LOCATIONS);
+  assert.equal(L.findItemByName(s, 'Milk').location, 'Fridge');
+  assert.equal(L.addItem(s, { name: 'Ice cream', location: 'Freezer' }).location, 'Freezer');
+  assert.equal(L.addItem(s, { name: 'Mystery', location: 'Attic' }).location, '', 'unknown location → not set');
+  L.addLocation(s, 'Garage');
+  assert.throws(() => L.addLocation(s, 'fridge'), /already a location/);
+  L.renameLocation(s, 'Tall cupboard', 'Big cupboard');
+  assert.equal(L.findItemByName(s, 'Paprika').location, 'Big cupboard');
+  L.removeLocation(s, 'Pantry');
+  assert.equal(L.findItemByName(s, 'Basmati rice').location, '', 'deleted location → not set');
+  assert.equal(L.locationUsage(s, 'Fridge').length, 7);
+  // sweep only the fridge
+  const seen = [];
+  const r = await L.sweep(s, async (q) => { seen.push(q.item.name); return { action: 'keep' }; }, { location: 'Fridge' });
+  assert.ok(seen.length > 0 && seen.every((n) => L.findItemByName(s, n).location === 'Fridge'), seen.join(', '));
+  assert.equal(r.total, seen.length);
+  const unset = await L.sweep(s, async () => ({ action: 'keep' }), { location: '' });
+  assert.ok(unset.total > 0, 'can sweep items with no location');
+  // storage + sync
+  assert.deepEqual(L.normalise(JSON.parse(JSON.stringify(s))).locations, s.locations);
+  const docs = L.toDocs(s);
+  assert.deepEqual(docs.get('meta/locations'), { locations: s.locations });
+  assert.equal(L.fromDocs(docs).items.find((i) => i.name === 'Paprika').location, 'Big cupboard');
+  assert.deepEqual(L.normalise({ items: [{ id: 'a', name: 'A' }], recipes: [] }).items[0].location, '');
+});
+
 module.exports = { test, tests, L, id, recipe, list, yes };
 
 // Run when called directly (other test files can add tests before running).

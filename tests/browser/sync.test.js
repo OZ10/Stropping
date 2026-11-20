@@ -1,4 +1,4 @@
-// Household sharing across two simulated phones, using an in-memory fake of
+﻿// Household sharing across two simulated phones, using an in-memory fake of
 // Firebase (tests the app's sync code, not the real service or its rules).
 const FAKE = require('./fake-firebase');
 const { assert, sleep, startServer, launch, newPage, helpers, steps } = require('./harness');
@@ -43,7 +43,7 @@ module.exports = async function syncTests() {
       hid = s.find(([k]) => /^households\/[^/]+$/.test(k))[0].split('/')[1];
       assert.equal(count(s, /\/recipes\//), 3);
       assert.ok(count(s, /\/items\//) >= 19);
-      assert.equal(count(s, /\/meta\//), 3, 'week, settings, labels');
+      assert.equal(count(s, /\/meta\//), 4, 'week, settings, labels, locations');
       assert.equal(await a.$eval('#sync-pill', (p) => p.textContent), 'Shared');
     }],
 

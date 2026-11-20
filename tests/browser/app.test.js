@@ -1,4 +1,4 @@
-// Browser tests for the app on one device (sharing switched off).
+﻿// Browser tests for the app on one device (sharing switched off).
 const { assert, sleep, startServer, launch, newPage, helpers, steps, LOCAL_ONLY } = require('./harness');
 
 module.exports = async function appTests() {
@@ -107,7 +107,7 @@ module.exports = async function appTests() {
 
     ['#39/#42 categories and units', async () => {
       await h.tab('Items');
-      await h.click('main button', 'Units & categories');
+      await h.click('main button', 'Item settings');
       await page.type('#sheet [data-list="categories"] [data-new-entry]', 'Baby');
       await page.keyboard.press('Enter');
       await sleep(200);
@@ -172,30 +172,30 @@ module.exports = async function appTests() {
       await h.click('#sheet button', 'Cancel');
     }],
 
-    ['#47 pick-lists are A–Z; shopping groups keep the household order', async () => {
+    ['#47 pick-lists are Aâ€“Z; shopping groups keep the household order', async () => {
       const isAlpha = (list) => list.every((v, i) => i === 0 || list[i - 1].localeCompare(v, undefined, { sensitivity: 'base' }) <= 0);
       await h.tab('Items');
       await h.click('main button', 'Onion');
       const cats = await h.texts('#sheet select[name=category] option');
       assert.equal(cats[cats.length - 1], 'Other', 'Other last');
-      assert.ok(isAlpha(cats.slice(0, -1)), `categories A–Z: ${cats.join(', ')}`);
+      assert.ok(isAlpha(cats.slice(0, -1)), `categories Aâ€“Z: ${cats.join(', ')}`);
       const units = await h.texts('#sheet select[name=unit] option');
-      assert.ok(isAlpha(units) && units.includes('punnet'), `units A–Z: ${units.join(', ')}`);
+      assert.ok(isAlpha(units) && units.includes('punnet'), `units Aâ€“Z: ${units.join(', ')}`);
       await page.keyboard.press('Escape');
       await sleep(200);
       await h.click('main button', '+ New item');
       const suggestions = await page.$$eval('#items-dl option', (os) => os.map((o) => o.value));
-      assert.ok(isAlpha(suggestions), 'item suggestions A–Z');
+      assert.ok(isAlpha(suggestions), 'item suggestions Aâ€“Z');
       await page.keyboard.press('Escape');
       await sleep(200);
       await h.tab('Recipes');
       const pressed = await page.$$eval('main .chips.filter .chip[aria-pressed="true"]', (cs) => cs.map((c) => c.textContent.trim()));
       const stored = await page.evaluate(() => localStorage.getItem('stropping:recipeFilter'));
       const filters = await h.texts('main .chips.filter .chip[data-label]');
-      assert.ok(isAlpha(filters), `label filters A–Z: ${filters.join(', ')}`);
+      assert.ok(isAlpha(filters), `label filters Aâ€“Z: ${filters.join(', ')}`);
       assert.deepEqual(pressed, [], `no filter left on (pressed: ${pressed.join(', ')}; stored: ${stored})`);
       await h.click('main button', 'Labels');
-      assert.ok(isAlpha(await page.$$eval('#sheet [data-entry]', (es) => es.map((e) => e.dataset.entry))), 'Labels screen A–Z');
+      assert.ok(isAlpha(await page.$$eval('#sheet [data-entry]', (es) => es.map((e) => e.dataset.entry))), 'Labels screen Aâ€“Z');
       assert.equal(await page.$$eval('#sheet [data-entry-act="up"]', (b) => b.length), 0, 'no reordering for labels');
       await h.click('#sheet button', 'Done');
       await h.tab('Shopping');
@@ -245,6 +245,58 @@ module.exports = async function appTests() {
       assert.ok(s.shopping.some((e) => e.itemId === itemId('Spinach')), 'spinach included');
       const meal = s.week.meals[s.week.meals.length - 1];
       assert.ok(!meal.alloc.some((a) => a.itemId === itemId('Basmati rice')), 'rice left out');
+    }],
+
+    ['#46 locations: set on items, managed, cupboard grouped/searched/swept by location', async () => {
+      // manage: add Garage
+      await h.tab('Items');
+      await h.click('main button', 'Item settings');
+      await page.type('#sheet [data-list="locations"] [data-new-entry]', 'Garage');
+      await page.keyboard.press('Enter');
+      await sleep(200);
+      assert.ok((await h.state()).locations.includes('Garage'));
+      await h.shot('item-settings-locations');
+      await h.click('#sheet button', 'Done');
+      // set on an item
+      await h.click('main button', 'Kitchen roll');
+      const locs = await h.texts('#sheet select[name=location] option');
+      assert.deepEqual(locs, ['Not set', 'Freezer', 'Fridge', 'Garage', 'Pantry', 'Tall cupboard']);
+      await page.select('#sheet select[name=location]', 'Garage');
+      await h.click('#sheet button', 'Save');
+      assert.equal((await h.state()).items.find((i) => i.name === 'Kitchen roll').location, 'Garage');
+      // cupboard: put kitchen roll in, group by location
+      await h.tab('Cupboard');
+      await h.click('main button', '+ Add');
+      await page.type('#sheet input[name=item]', 'Kitchen roll');
+      await h.clickSel('#sheet .sheet-actions .btn.primary');
+      await h.click('main .segmented button', 'Location');
+      const groups = await h.texts('main .group h3');
+      assert.deepEqual(groups, [...groups].sort((a, b) => (a === 'No location') - (b === 'No location') || a.localeCompare(b)), `A–Z, No location last: ${groups.join(', ')}`);
+      assert.ok(groups.includes('Garage') && groups.includes('Fridge'));
+      await h.shot('cupboard-by-location');
+      await page.reload();
+      await sleep(300);
+      assert.equal(await page.$eval('main .segmented [aria-pressed="true"]', (b) => b.textContent), 'Location', 'grouping remembered');
+      // search matches location
+      await h.setValue('#view [data-search]', 'garage');
+      assert.deepEqual(await visibleRows(), ['Kitchen roll']);
+      await h.setValue('#view [data-search]', '');
+      // sweep just the fridge
+      await h.click('main button', 'Sweep');
+      assert.equal(await h.promptTitle(), 'Sweep which location?');
+      await h.shot('sweep-which');
+      await h.click('#prompt button', 'Fridge');
+      const fridge = (await h.state()).items.filter((i) => i.location === 'Fridge').map((i) => i.name);
+      const swept = [];
+      for (let i = 0; i < 20; i++) {
+        const t = await h.promptTitle().catch(() => null);
+        if (!t) break;
+        swept.push(t);
+        await h.answer('Still there');
+      }
+      assert.ok(swept.length > 0 && swept.every((n) => fridge.includes(n)), `swept: ${swept.join(', ')}`);
+      await h.click('main .segmented button', 'Category');
+      return `swept ${swept.length} fridge items`;
     }],
 
     ['#48 cupboard search', async () => {

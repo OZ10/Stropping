@@ -199,6 +199,17 @@ button.card:hover { border-color: var(--muted); }
 .panel .hint { margin-top: 0; }
 .foot { margin-top: 16px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 
+.toolbar { display: grid; gap: 10px; }
+.segmented {
+  display: flex; align-items: center; gap: 4px; justify-self: start;
+  padding: 3px; border-radius: 999px; background: var(--surface-2); font-size: .85rem;
+}
+.segmented span { padding: 0 8px 0 10px; color: var(--muted); }
+.segmented button {
+  min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer;
+}
+.segmented button[aria-pressed="true"] { background: var(--surface); box-shadow: var(--shadow); color: var(--accent); }
 .search {
   width: 100%; min-height: 44px; padding: 0 14px; margin-bottom: 2px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit;

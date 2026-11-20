@@ -35,7 +35,8 @@ rules_version = '2';
 //                  frequent, shortLife, multiUse (bool); all required.
 //                  (Units and categories are household-editable, see meta/settings,
 //                  so they are length-checked rather than matched against a fixed list.)
-//                  Optional: defaultQty (number 0–1,000,000; 0 = none), frequentBuy (bool)
+//                  Optional: defaultQty (number 0–1,000,000; 0 = none), frequentBuy (bool),
+//                  location (string ≤ 50; '' = not set)
 //   recipes/{id}:  id (== docId), name (1–200), url ('' or http(s), ≤ 2048),
 //                  serves (number 1–1000), ingredients (list ≤ 100 of {itemId, qty}),
 //                  instructions (optional string ≤ 20,000), labels (optional list ≤ 20 of names)
@@ -49,6 +50,7 @@ rules_version = '2';
 //                  lastWeek (null | {start, cooked, carried, dropped, binned}; lists ≤ 100)
 //   meta/settings: customUnits (list ≤ 50 of {name, count}), categories (list ≤ 50 of names)
 //   meta/labels:   labels (list ≤ 50 of recipe label names)
+//   meta/locations: locations (list ≤ 50 of location names)
 //
 // Collection: invites
 // Document ID: 8-char code from A–Z and 2–9 (random, ~40 bits)
@@ -59,7 +61,7 @@ rules_version = '2';
 //   - expiresAt: timestamp - in the future, at most 8 days ahead
 //
 // Known limitation: rules cannot loop over lists, so the *elements* of
-// recipes.ingredients, recipes.labels, meals.alloc, lastWeek, settings and label lists are
+// recipes.ingredients, recipes.labels, meals.alloc, lastWeek, settings, label and location lists are
 // size-capped but not individually type-checked. Only household members can
 // write them, and the app re-validates them when it reads them.
 // ===============================================================
@@ -172,9 +174,10 @@ service cloud.firestore {
 
     function isValidItem(docId, d) {
       return d.keys().hasAll(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse'])
-        && d.keys().hasOnly(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse', 'defaultQty', 'frequentBuy'])
+        && d.keys().hasOnly(['id', 'name', 'unit', 'category', 'frequent', 'shortLife', 'multiUse', 'defaultQty', 'frequentBuy', 'location'])
         && (!('defaultQty' in d) || isAmount(d.defaultQty))
         && (!('frequentBuy' in d) || d.frequentBuy is bool)
+        && (!('location' in d) || isShortString(d.location, 0, 50))
         && d.id == docId
         && isShortString(d.name, 1, 100)
         && isShortString(d.unit, 1, 20)
@@ -246,6 +249,10 @@ service cloud.firestore {
       return hasExactFields(d, ['labels']) && isValidList(d.labels, 50);
     }
 
+    function isValidLocations(d) {
+      return hasExactFields(d, ['locations']) && isValidList(d.locations, 50);
+    }
+
     function isHouseholdCollection(collection) {
       return collection in ['items', 'recipes', 'shopping', 'cupboard', 'meals', 'meta'];
     }
@@ -258,7 +265,8 @@ service cloud.firestore {
         || (collection == 'meals' && isValidMeal(docId, d))
         || (collection == 'meta' && docId == 'week' && isValidWeekMeta(d))
         || (collection == 'meta' && docId == 'settings' && isValidSettings(d))
-        || (collection == 'meta' && docId == 'labels' && isValidLabels(d));
+        || (collection == 'meta' && docId == 'labels' && isValidLabels(d))
+        || (collection == 'meta' && docId == 'locations' && isValidLocations(d));
     }
 
     // A member removes only themselves (and their display name); nothing else changes.
