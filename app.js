@@ -22,7 +22,8 @@
   let tab = 'week';
   try { tab = localStorage.getItem(TAB_KEY) || 'week'; } catch (e) { /* storage blocked */ }
   if (!TABS.includes(tab)) tab = 'week';
-  let itemFilter = '';
+  // Search text for the Items and Cupboard tabs, kept per tab while the app is open.
+  const searches = { items: '', cupboard: '' };
 
   // ---------- Sharing (sync.js) ----------
   const SHARED_KEY = 'stropping:shared';
@@ -221,7 +222,7 @@
     const c = $('#shop-count');
     c.hidden = !n;
     c.textContent = n;
-    if (tab === 'items') applyItemFilter();
+    if (tab in searches) applySearch();
   }
 
   function go(t) {
@@ -377,13 +378,15 @@
           <button class="btn primary" data-act="add-cupboard">+ Add</button>
         </div>
       </div>
+      ${rows.length ? searchBox('Search the cupboard') : ''}
       ${rows.length ? byCategory(rows).map(([cat, list]) => `
-        <section class="group"><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ item, qty }) => `
-          <li><button class="row-main" data-act="edit-cupboard" data-id="${item.id}">
+        <section class="group" data-group><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ item, qty }) => `
+          <li data-search-text="${esc(`${item.name} ${item.category}`.toLowerCase())}"><button class="row-main" data-act="edit-cupboard" data-id="${item.id}">
             <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span>
             <span class="qty">${esc(itemQty(item, qty))}</span>
           </button></li>`).join('')}</ul></section>`).join('')
         : empty('The cupboard is empty. Add what you have in stock, or tick things off the shopping list and they’ll be added here.')}
+      <p class="hint empty-search" hidden>Nothing in the cupboard matches.</p>
       ${rows.length ? '<p class="hint">Sweep goes through each item so you can confirm it’s still there.</p>' : ''}`;
   }
 
@@ -424,10 +427,10 @@
           <button class="btn primary" data-act="new-item">+ New item</button>
         </div>
       </div>
-      ${rows.length ? `<input type="search" class="search" data-filter placeholder="Search items" aria-label="Search items" value="${esc(itemFilter)}">` : ''}
+      ${rows.length ? searchBox('Search items') : ''}
       ${rows.length ? byCategory(rows).map(([cat, list]) => `
         <section class="group" data-group><h3>${esc(cat)}</h3><ul class="rows">${list.map(({ item }) => `
-          <li data-name="${esc(item.name.toLowerCase())}">
+          <li data-search-text="${esc(item.name.toLowerCase())}">
             <button class="row-main" data-act="edit-item" data-id="${item.id}">
               <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}</span>
               <span class="sub" title="${item.defaultQty > 0 ? 'Default amount' : 'Unit'}">${esc(item.defaultQty > 0 && !item.multiUse ? fmtQty(item.defaultQty, item.unit) : item.unit)}</span>
@@ -438,21 +441,24 @@
       <p class="hint empty-search" hidden>No items match.</p>`;
   }
 
-  function applyItemFilter() {
-    const q = itemFilter.trim().toLowerCase();
-    let any = false;
-    $$('[data-group]').forEach((g) => {
+  const searchBox = (placeholder) =>
+    `<input type="search" class="search" data-search placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}" value="${esc(searches[tab])}">`;
+
+  /** Hide rows (and empty groups) on the current tab that don't match its search box. */
+  function applySearch() {
+    const q = (searches[tab] || '').trim().toLowerCase();
+    const rows = $$('#view li[data-search-text]');
+    $$('#view [data-group]').forEach((g) => {
       let shown = 0;
-      $$('li[data-name]', g).forEach((li) => {
-        const ok = !q || li.dataset.name.includes(q);
+      $$('li[data-search-text]', g).forEach((li) => {
+        const ok = !q || li.dataset.searchText.includes(q);
         li.hidden = !ok;
         if (ok) shown++;
       });
       g.hidden = !shown;
-      if (shown) any = true;
     });
-    const msg = $('.empty-search');
-    if (msg) msg.hidden = any || !state.items.length;
+    const msg = $('#view .empty-search');
+    if (msg) msg.hidden = !rows.length || rows.some((li) => !li.hidden);
   }
 
   // ---------- Dialogs ----------
@@ -1572,9 +1578,9 @@
   });
 
   document.addEventListener('input', (e) => {
-    if (e.target.matches('[data-filter]')) {
-      itemFilter = e.target.value;
-      applyItemFilter();
+    if (e.target.matches('[data-search]')) {
+      searches[tab] = e.target.value;
+      applySearch();
     }
   });
 
