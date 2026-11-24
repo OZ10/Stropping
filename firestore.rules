@@ -50,7 +50,8 @@ rules_version = '2';
 //                  portions (number 1–1000), cooked (bool), at (number ≥ 0, ms),
 //                  alloc (list ≤ 100 of {itemId, need, fromCupboard, toShop})
 //   meta/week:     id (string ≤ 64), start ('YYYY-MM-DD'),
-//                  lastWeek (null | {start, cooked, carried, dropped, binned}; lists ≤ 100)
+//                  lastWeek (null | {start, cooked, carried, dropped, binned}; lists ≤ 100),
+//                  model (optional number 1–100: data version; 2 = cupboard is what's physically there, #51)
 //   meta/settings: customUnits (list ≤ 50 of {name, count}), categories (list ≤ 50 of names)
 //   meta/labels:   labels (list ≤ 50 of recipe label names)
 //   meta/locations: locations (list ≤ 50 of location names)
@@ -237,7 +238,9 @@ service cloud.firestore {
     }
 
     function isValidWeekMeta(d) {
-      return hasExactFields(d, ['id', 'start', 'lastWeek'])
+      return d.keys().hasAll(['id', 'start', 'lastWeek'])
+        && d.keys().hasOnly(['id', 'start', 'lastWeek', 'model'])
+        && (!('model' in d) || (d.model is number && d.model >= 1 && d.model <= 100))
         && isId(d.id)
         && isDateString(d.start)
         && isValidLastWeek(d.lastWeek);

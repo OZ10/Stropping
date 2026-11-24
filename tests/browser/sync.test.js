@@ -111,6 +111,36 @@ module.exports = async function syncTests() {
       assert.equal(await b.$eval('#sync-pill', (p) => p.hidden), true);
     }],
 
+    ['#51 old household data is converted once and written back', async () => {
+      // A copy of the household as an older app version saved it (no model marker).
+      const seed = await store(a);
+      const week = seed.find(([k]) => k === `households/${hid}/meta/week`)[1];
+      delete week.model;
+      const meals = seed.filter(([k]) => k.startsWith(`households/${hid}/meals/`)).map(([, v]) => v);
+      const cup = (entries, itemId) => (entries.find(([k]) => k === `households/${hid}/cupboard/${itemId}`) || [, { qty: 0 }])[1].qty;
+      const alloc = meals.flatMap((m) => m.alloc).find((x) => x.fromCupboard > 0);
+      assert.ok(alloc, 'a planned meal with something set aside');
+      const before = cup(seed, alloc.itemId);
+      const c = await device(browser, 'u1', 'Alex', seed);
+      await c.goto('http://localhost:8772/');
+      await helpers(c, 'sync-c').clickSel('[data-act=menu]');
+      await helpers(c, 'sync-c').click('#household button', 'Sign in with Google');
+      await sleep(900);
+      const after = await store(c);
+      assert.equal(after.find(([k]) => k === `households/${hid}/meta/week`)[1].model, 2, 'marked as converted');
+      assert.ok(cup(after, alloc.itemId) >= before + alloc.fromCupboard - 0.001, `put back once: ${before} → ${cup(after, alloc.itemId)}`);
+      // Another phone opening the converted household doesn't convert it again
+      const once = cup(after, alloc.itemId);
+      const d = await device(browser, 'u1', 'Alex', after);
+      await d.goto('http://localhost:8772/');
+      await helpers(d, 'sync-d').clickSel('[data-act=menu]');
+      await helpers(d, 'sync-d').click('#household button', 'Sign in with Google');
+      await sleep(900);
+      assert.equal(cup(await store(d), alloc.itemId), once, 'not converted twice');
+      assert.deepEqual([...c.errors, ...d.errors], []);
+      return `${before} → ${once}`;
+    }],
+
     ['no console errors', async () => {
       assert.deepEqual([...a.errors, ...b.errors], []);
     }],

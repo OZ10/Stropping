@@ -329,7 +329,10 @@ module.exports = async function appTests() {
       await h.click('#sheet button', 'Add to week');
       await h.answerPlanning();
       const after = await h.state();
-      assert.equal(after.cupboard[breadId] || 0, Math.round((loaves - 0.1) * 100) / 100, `bread ${loaves} → ${after.cupboard[breadId]}`);
+      // #51: the 2 slices are set aside, not removed, until the meal is cooked
+      assert.equal(after.cupboard[breadId] || 0, loaves, 'cupboard unchanged by planning');
+      const breadMeal = after.week.meals[after.week.meals.length - 1];
+      assert.equal(breadMeal.alloc.find((a) => a.itemId === breadId).fromCupboard, 0.1, '0.1 loaf set aside');
       // Plan pancakes with jam: asked whether there's jam, not counted
       await h.click('main button', 'Add meal');
       await page.select('#sheet select[name=recipe]', after.recipes.find((r) => r.name === 'Pancakes').id);
@@ -350,7 +353,52 @@ module.exports = async function appTests() {
       }
       await h.answer('Done');
       assert.ok(sawJam, 'asked about the jam');
-      return `bread ${loaves} → ${after.cupboard[breadId]} loaf`;
+      return `bread ${loaves} loaf, 0.1 set aside`;
+    }],
+
+    ['#51 cupboard is what’s there: set aside when planned, used up when cooked', async () => {
+      // fresh start so earlier steps don't muddy the numbers
+      await page.evaluate(() => localStorage.clear());
+      await page.reload();
+      await sleep(300);
+      await h.click('main button', 'Try sample data');
+      const s0 = await h.state();
+      const idOf = (s, n) => s.items.find((i) => i.name === n).id;
+      await h.click('main button', 'Add meal');
+      await page.select('#sheet select[name=recipe]', s0.recipes.find((r) => r.name === 'Chicken curry').id);
+      await h.setValue('#sheet input[name=portions]', 6);
+      await h.click('#sheet button', 'Add to week');
+      await h.answerPlanning();
+      let s = await h.state();
+      assert.equal(s.cupboard[idOf(s, 'Chicken breast')], 500, 'planning leaves the chicken in the cupboard');
+      // shop: tick everything
+      await h.tab('Shopping');
+      await page.evaluate(() => document.querySelectorAll('li.shop input[type=checkbox]').forEach((c) => c.click()));
+      await sleep(300);
+      s = await h.state();
+      assert.equal(s.cupboard[idOf(s, 'Chicken breast')], 750, 'bought chicken goes in the cupboard');
+      await h.tab('Cupboard');
+      const row = await page.evaluate(() => [...document.querySelectorAll('#view li')].find((li) => li.textContent.includes('Chicken breast')).textContent.replace(/\s+/g, ' ').trim());
+      assert.match(row, /750 g for this week’s meals/, row);
+      await h.shot('cupboard-set-aside');
+      // tick cooked during the week: nothing used yet
+      await h.tab('Week');
+      await h.clickSel('.meal input[data-act=cooked]');
+      s = await h.state();
+      assert.equal(s.cupboard[idOf(s, 'Chicken breast')], 750, 'ticking cooked alone changes nothing');
+      // start a new week: now it's used up
+      await h.click('main button', 'Start a new week');
+      await h.answer('Start');
+      for (let i = 0; i < 10; i++) {
+        const t = await h.promptTitle();
+        if (t.includes('New week started')) break;
+        await h.answer('Yes');
+      }
+      await h.answer('Done');
+      s = await h.state();
+      assert.equal(s.cupboard[idOf(s, 'Chicken breast')], undefined, 'chicken used up (issue #51)');
+      assert.equal(s.cupboard[idOf(s, 'Basmati rice')], 550);
+      assert.equal(s.cupboard[idOf(s, 'Onion')], 1.5);
     }],
 
     ['#48 cupboard search', async () => {

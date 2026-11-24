@@ -72,7 +72,11 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  const newWeek = (meals = []) => ({ id: uid(), start: today(), meals });
+  // Data model version, stored on the week. 2 (#51): the cupboard holds what's
+  // physically there; planned meals' ingredients are set aside, not removed,
+  // and are used up when the meal is confirmed cooked at the start of a new week.
+  const MODEL = 2;
+  const newWeek = (meals = []) => ({ id: uid(), start: today(), meals, model: MODEL });
 
   // ---------- Settings: custom units and editable categories ----------
 
@@ -300,6 +304,7 @@
       s.week = {
         id: raw.week.id || uid(),
         start: raw.week.start || today(),
+        model: Number(raw.week.model) || 1,
         meals: raw.week.meals.map((m) => ({
           id: m.id || uid(), recipeId: m.recipeId, name: String(m.name || 'Meal'), url: m.url || '',
           portions: Number(m.portions) || 1, cooked: !!m.cooked, at: Number(m.at) || 0,
@@ -441,8 +446,9 @@
   }
 
   /**
-   * Tick or untick a list entry. Ticking puts anything beyond what planned meals
-   * need into the cupboard (multi-use items are simply marked in stock).
+   * Tick or untick a list entry. Ticking puts what was bought into the cupboard;
+   * the part bought for planned meals stays set aside for them (multi-use items
+   * are simply marked in stock).
    */
   function setBought(s, entryId, done) {
     const e = s.shopping.find((x) => x.id === entryId);
@@ -451,7 +457,7 @@
     if (done) {
       let added = 0;
       if (item && item.multiUse) added = cupQty(s, e.itemId) > EPS ? 0 : 1;
-      else added = Math.max(0, round(buyQty(s, e) - e.reserved));
+      else added = buyQty(s, e);
       setCup(s, e.itemId, cupQty(s, e.itemId) + added);
       e.added = added;
       e.done = true;
@@ -548,18 +554,19 @@
         continue;
       }
 
-      let avail = cupQty(s, item.id);
+      // Only what isn't already set aside for other planned meals is free to use.
+      let avail = available(s, item.id);
       if (item.frequent && avail > EPS && !answered.has(item.id)) {
         const has = await ask({ kind: 'frequent', item, meal, need, qty: avail });
         if (has == null) return null;
         answered.set(item.id, has);
         if (!has) {
-          setCup(s, item.id, 0);
+          setCup(s, item.id, cupQty(s, item.id) - avail); // the free amount has gone
           avail = 0;
         }
       }
+      // Set aside, not removed: it stays in the cupboard until the meal is cooked (#51).
       const take = round(Math.min(avail, need));
-      setCup(s, item.id, avail - take);
       const short = round(need - take);
       if (short > EPS) addToShopping(s, item.id, short, short);
       meal.alloc.push({ itemId: item.id, need, fromCupboard: take, toShop: short });
@@ -570,28 +577,58 @@
     return { state: s, meal, report };
   }
 
-  /** How much of an allocation is physically held (taken from the cupboard or already bought). */
+  /** How much of an allocation is in hand (set aside from the cupboard, or bought). */
   function heldFor(s, a) {
     const e = unboughtEntry(s, a.itemId);
     const stillToBuy = Math.min(a.toShop, e ? e.reserved : 0);
     return round(a.fromCupboard + (a.toShop - stillToBuy));
   }
 
-  /** Give a meal's ingredients back: to the cupboard if held, off the list if not yet bought. */
+  /** Amount of an item in the cupboard that's set aside for this week's planned meals. */
+  const setAsideFor = (s, itemId) => round(s.week.meals.reduce(
+    (t, m) => t + m.alloc.filter((a) => a.itemId === itemId).reduce((u, a) => u + heldFor(s, a), 0), 0));
+
+  /** What's in the cupboard and not set aside for a planned meal. */
+  const available = (s, itemId) => Math.max(0, round(cupQty(s, itemId) - setAsideFor(s, itemId)));
+
+  /** A meal that won't be cooked: its ingredients stay in the cupboard; anything not yet bought comes off the list. */
   function releaseMeal(s, meal) {
+    for (const a of meal.alloc) if (a.toShop > EPS) unreserve(s, a.itemId, a.toShop);
+  }
+
+  /** A cooked meal: use up what was set aside for it, and drop anything still on the list for it. */
+  function consumeMeal(s, meal) {
     for (const a of meal.alloc) {
-      let back = a.fromCupboard;
-      if (a.toShop > EPS) back += a.toShop - unreserve(s, a.itemId, a.toShop);
-      if (back > EPS) setCup(s, a.itemId, cupQty(s, a.itemId) + back);
+      const used = heldFor(s, a);
+      if (a.toShop > EPS) unreserve(s, a.itemId, a.toShop);
+      if (used > EPS) setCup(s, a.itemId, cupQty(s, a.itemId) - used);
     }
   }
 
+  /** Take a meal off the plan. If it's marked cooked its ingredients are used up; otherwise they stay. */
   function removeMeal(state, mealId) {
     const s = clone(state);
     const meal = s.week.meals.find((m) => m.id === mealId);
     if (!meal) return s;
-    releaseMeal(s, meal);
+    if (meal.cooked) consumeMeal(s, meal);
+    else releaseMeal(s, meal);
     s.week.meals = s.week.meals.filter((m) => m !== meal);
+    return s;
+  }
+
+  /** Data saved before #51 already had planned meals' ingredients removed from the cupboard. */
+  const needsMigration = (s) => !(s.week.model >= MODEL);
+
+  /** Put those ingredients back once, so they're used up when the meal is cooked rather than twice. */
+  function migrate(state) {
+    const s = clone(state);
+    for (const m of s.week.meals) {
+      for (const a of m.alloc) {
+        const held = heldFor(s, a);
+        if (held > EPS) setCup(s, a.itemId, cupQty(s, a.itemId) + held);
+      }
+    }
+    s.week.model = MODEL;
     return s;
   }
 
@@ -603,9 +640,10 @@
   /**
    * Close the current week and start a new one:
    *  1. ask about every meal not already ticked as cooked: cooked / carry over / drop
-   *     (dropped meals give their ingredients back to the cupboard)
-   *  2. for carried-over meals, check short-life ingredients are still in date
-   *  3. check every short-life item in the cupboard that no cooked meal used
+   *  2. cooked meals use up their ingredients from the cupboard (#51); dropped
+   *     meals release theirs (they stay in the cupboard, unbought ones come off the list)
+   *  3. for carried-over meals, check short-life ingredients are still in date
+   *  4. check every other short-life item in the cupboard that no cooked meal used
    * Returns { state, summary } or null if cancelled.
    */
   async function startNewWeek(state, ask) {
@@ -622,13 +660,15 @@
       if (ans == null) return null;
       if (ans === 'cooked') cooked.push(meal);
       else if (ans === 'carry') carried.push(meal);
-      else {
-        releaseMeal(s, meal);
-        dropped.push(meal);
-      }
+      else dropped.push(meal);
     }
 
+    for (const meal of cooked) consumeMeal(s, meal);
+    for (const meal of dropped) releaseMeal(s, meal);
+    s.week.meals = carried; // what's still planned (and still set aside)
+
     const used = new Set(cooked.flatMap((m) => m.alloc.filter((a) => a.need > EPS).map((a) => a.itemId)));
+    const checked = new Set();
 
     for (const meal of carried) {
       for (const a of meal.alloc) {
@@ -636,11 +676,15 @@
         if (!item || !item.shortLife) continue;
         const held = heldFor(s, a);
         if (held <= EPS) continue;
+        checked.add(item.id);
         const ok = await ask({ kind: 'shortlife-meal', item, meal, qty: held });
         if (ok == null) return null;
         if (!ok) {
+          // Throw out what was held for the meal and buy it again.
+          setCup(s, item.id, cupQty(s, item.id) - held);
+          const stillToBuy = round(a.toShop - (held - a.fromCupboard));
           addToShopping(s, item.id, held, held);
-          a.toShop = round(a.toShop + a.fromCupboard);
+          a.toShop = round(stillToBuy + held);
           a.fromCupboard = 0;
           binned.push(item.name);
         }
@@ -649,13 +693,14 @@
 
     const toCheck = Object.keys(s.cupboard)
       .map((id) => itemById(s, id))
-      .filter((item) => item && item.shortLife && !used.has(item.id))
+      .filter((item) => item && item.shortLife && !used.has(item.id) && !checked.has(item.id) && available(s, item.id) > EPS)
       .sort((a, b) => a.name.localeCompare(b.name));
     for (const item of toCheck) {
-      const ok = await ask({ kind: 'shortlife', item, qty: cupQty(s, item.id) });
+      const qty = available(s, item.id);
+      const ok = await ask({ kind: 'shortlife', item, qty });
       if (ok == null) return null;
       if (!ok) {
-        setCup(s, item.id, 0);
+        setCup(s, item.id, cupQty(s, item.id) - qty);
         binned.push(item.name);
       }
     }
@@ -688,7 +733,7 @@
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const qty = cupQty(s, item.id);
-      const ans = await ask({ kind: 'sweep', item, qty, index: i, total: items.length });
+      const ans = await ask({ kind: 'sweep', item, qty, setAside: setAsideFor(s, item.id), index: i, total: items.length });
       if (ans == null) break;
       reviewed++;
       if (ans.action === 'gone') {
@@ -782,7 +827,7 @@
     for (const e of s.shopping) d.set(`shopping/${e.id}`, clone(e));
     for (const [id, qty] of Object.entries(s.cupboard)) d.set(`cupboard/${id}`, { qty });
     s.week.meals.forEach((m, n) => d.set(`meals/${m.id}`, { ...clone(m), at: m.at || n }));
-    d.set('meta/week', { id: s.week.id, start: s.week.start, lastWeek: s.lastWeek ? clone(s.lastWeek) : null });
+    d.set('meta/week', { id: s.week.id, start: s.week.start, model: s.week.model || MODEL, lastWeek: s.lastWeek ? clone(s.lastWeek) : null });
     d.set('meta/settings', clone(s.settings));
     // Separate from settings so an older app version saving settings can't drop the labels.
     d.set('meta/labels', { labels: [...s.labels] });
@@ -847,6 +892,7 @@
     if (meta) {
       s.week.id = meta.id || s.week.id;
       s.week.start = meta.start || s.week.start;
+      s.week.model = Number(meta.model) || 1;
       s.lastWeek = meta.lastWeek || null;
     }
     return s;
@@ -881,6 +927,7 @@
     cupQty, setCup,
     addToShopping, buyQty, setBought, clearBought, clearShopping, unreserve,
     scaleQty, planMeal, removeMeal, setCooked, startNewWeek, sweep, heldFor,
+    setAsideFor, available, needsMigration, migrate, MODEL,
     SYNC_COLLECTIONS, toDocs, fromDocs, diffDocs, applyDocChanges,
   };
 

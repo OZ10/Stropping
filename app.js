@@ -56,7 +56,9 @@
     }
     if (!raw) return L.emptyState();
     try {
-      return L.normalise(JSON.parse(raw));
+      const s = L.normalise(JSON.parse(raw));
+      // Data from before #51 had planned meals' ingredients already removed: put them back once.
+      return L.needsMigration(s) ? L.migrate(s) : s;
     } catch (e) {
       try { localStorage.setItem(`${KEY}:unreadable-${Date.now()}`, raw); } catch (_) { /* ignore */ }
       setTimeout(() => toast('Saved data couldn’t be read. A copy was kept and the app started empty.'), 300);
@@ -96,6 +98,15 @@
   // Called by sync.js with the household's documents whenever they change.
   function onRemote(docs) {
     let next = L.fromDocs(docs);
+    // Household data from before #51: convert once and write it back, so other
+    // phones see it already converted. (The conversion sets absolute amounts, so
+    // two phones doing it at the same moment write the same values.)
+    if (L.needsMigration(next)) {
+      shadow = clone(next);
+      state = L.migrate(next);
+      commit();
+      return;
+    }
     if (queued.length && shared()) {
       for (const ch of queued) {
         next = L.applyDocChanges(next, ch);
@@ -289,7 +300,7 @@
       ${toBuy ? `<button class="banner" data-act="go" data-tab="shopping"><span><strong>${toBuy}</strong> ${toBuy === 1 ? 'item' : 'items'} on the shopping list</span><span aria-hidden="true">→</span></button>` : ''}
       ${fresh ? '' : `<section class="panel">
         <h3>Ready for next week’s shop?</h3>
-        <p>Confirm which meals you cooked. Ingredients for uncooked meals go back in the cupboard, and short-life items get an in-date check.</p>
+        <p>Confirm which meals you cooked: their ingredients are used up from the cupboard. Uncooked meals can be kept or dropped, and short-life items get an in-date check.</p>
         <button class="btn" data-act="new-week">Start a new week</button>
         ${lastWeek}
       </section>`}`;
@@ -412,9 +423,11 @@
         <section class="group" data-group><h3>${esc(group || 'No location')}</h3><ul class="rows">${list.map(({ item, qty }) => {
           // Show the other grouping as a hint on each row.
           const other = cupGroup === 'location' ? item.category : item.location;
+          const aside = item.multiUse ? 0 : L.setAsideFor(state, item.id); // #51: still here, but promised to a meal
+          const sub = [other, aside > L.EPS && `${fmtQty(Math.min(aside, qty), item.unit)} for this week’s meals`].filter(Boolean).join(' · ');
           return `
           <li data-search-text="${esc(`${item.name} ${item.category} ${item.location}`.toLowerCase())}"><button class="row-main" data-act="edit-cupboard" data-id="${item.id}">
-            <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}${other ? `<span class="sub">${esc(other)}</span>` : ''}</span>
+            <span class="grow"><span class="title">${esc(item.name)}</span>${badges(item)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</span>
             <span class="qty">${esc(itemQty(item, qty))}</span>
           </button></li>`;
         }).join('')}</ul></section>`).join('')
@@ -446,7 +459,7 @@
         ${ticked ? `<button class="btn" data-act="clear-bought">Clear ${plural(ticked, 'ticked item')}</button>` : ''}
         <button class="btn danger-text" data-act="clear-list">Clear list</button>
       </div>` : ''}
-      ${rows.length ? '<p class="hint">Ticking an item puts it in the cupboard, apart from the amount set aside for this week’s meals.</p>' : ''}`;
+      ${rows.length ? '<p class="hint">Ticking an item puts it in the cupboard. Anything bought for this week’s meals is set aside for them until they’re cooked.</p>' : ''}`;
   }
 
   function renderItems() {
@@ -638,7 +651,7 @@
         return ask({
           progress: `Last week · meal ${q.index + 1} of ${q.total}`,
           title: `Did you cook ${q.meal.name}?`,
-          text: `${plural(q.meal.portions, 'portion')}. If you drop it, its ingredients go back in the cupboard.`,
+          text: `${plural(q.meal.portions, 'portion')}. If you cooked it, its ingredients are used up from the cupboard. If you drop it, they stay.`,
           stack: true,
           buttons: [
             { label: 'Yes, cooked', value: 'cooked', style: 'primary' },
@@ -665,7 +678,7 @@
         const res = await ask({
           progress: `Sweep · ${q.index + 1} of ${q.total}`,
           title: item.name,
-          text: item.multiUse ? 'Still in stock?' : 'Still in the cupboard? Change the amount if it’s different.',
+          text: item.multiUse ? 'Still in stock?' : `Still in the cupboard? Change the amount if it’s different.${q.setAside > L.EPS ? ` ${fmtQty(q.setAside, item.unit)} of it is set aside for this week’s meals.` : ''}`,
           input: item.multiUse ? null : { label: `Amount (${item.unit})`, value: num(q.qty) },
           buttons: [
             { label: 'Stop', value: null, style: 'quiet' },
@@ -731,7 +744,7 @@
     const lines = [
       s.cooked.length && `<li><strong>Cooked</strong><span>${esc(s.cooked.join(', '))}</span></li>`,
       s.carried.length && `<li><strong>Kept for this week</strong><span>${esc(s.carried.join(', '))}</span></li>`,
-      s.dropped.length && `<li><strong>Dropped, ingredients back in the cupboard</strong><span>${esc(s.dropped.join(', '))}</span></li>`,
+      s.dropped.length && `<li><strong>Dropped, ingredients left in the cupboard</strong><span>${esc(s.dropped.join(', '))}</span></li>`,
       s.binned.length && `<li><strong>Thrown out</strong><span>${esc(s.binned.join(', '))}</span></li>`,
     ].filter(Boolean);
     const v = await ask({
@@ -827,7 +840,7 @@
       const unit = g.unit || item.unit;
       const need = L.scaleQty(r, g.qty, portions); // in the recipe's unit
       const needItem = item.multiUse ? null : L.toItemUnit(item, need, unit); // in the item's unit, if countable
-      const have = L.cupQty(state, item.id);
+      const have = L.available(state, item.id); // not counting what's set aside for planned meals
       let status;
       if (needItem == null) status = have ? '<span class="ok">In cupboard</span>' : '<span class="need">Not in cupboard</span>';
       else if (have >= needItem - L.EPS) status = '<span class="ok">In cupboard</span>';
@@ -1547,9 +1560,10 @@
           <input type="file" accept="application/json,.json" hidden>
         </div>
         <details class="about"><summary>How it works</summary>
-          <p><strong>Plan a meal</strong> and Stropping takes what it can from the cupboard and adds the rest to the shopping list, scaled to your portions.</p>
-          <p><strong>Tick items off</strong> while shopping. What you buy for planned meals is set aside for them; anything extra goes into the cupboard.</p>
-          <p><strong>Start a new week</strong> to confirm what you cooked. Ingredients for uncooked meals go back in the cupboard, and short-life items get an in-date check.</p>
+          <p><strong>The cupboard</strong> shows what’s physically there. Ingredients for planned meals stay in it, marked as set aside, until the meal is cooked.</p>
+          <p><strong>Plan a meal</strong> and Stropping sets aside what it can from the cupboard and adds the rest to the shopping list, scaled to your portions.</p>
+          <p><strong>Tick items off</strong> while shopping and they go into the cupboard, set aside for the meals they were bought for.</p>
+          <p><strong>Start a new week</strong> to confirm what you cooked: those ingredients are used up. Uncooked meals can be kept or dropped, and short-life items get an in-date check.</p>
           <p><strong>Sweep</strong> the cupboard now and then to bring it back in line with reality.</p>
         </details>
         <p class="hint" id="storage-note">${storageNote()}</p>`,
@@ -1621,13 +1635,11 @@
     'remove-meal': async (id) => {
       const meal = state.week.meals.find((m) => m.id === id);
       if (!meal) return;
-      if (!(await confirm(`Remove ${meal.name}?`, meal.cooked ? 'It’s marked as cooked, so nothing goes back in the cupboard.' : 'Its ingredients go back in the cupboard, and anything not yet bought comes off the list.', 'Remove'))) return;
-      if (meal.cooked) {
-        state.week.meals = state.week.meals.filter((m) => m.id !== id);
-        commit();
-      } else {
-        commit(L.removeMeal(state, id));
-      }
+      const what = meal.cooked
+        ? 'It’s marked as cooked, so its ingredients will be used up from the cupboard.'
+        : 'Its ingredients stay in the cupboard, and anything not yet bought comes off the list.';
+      if (!(await confirm(`Remove ${meal.name}?`, what, 'Remove'))) return;
+      commit(L.removeMeal(state, id));
     },
     'new-week': newWeekFlow,
     'new-recipe': () => editRecipe(null),

@@ -26,18 +26,34 @@ test('plan a scaled meal: cupboard first, shortfall to the list, multi-use asked
   t = (await L.planMeal(t, recipe(t, 'Chicken curry'), 6, scripted({
     'multi:Ground cumin': true, 'multi:Paprika': false, 'multi:Olive oil': true,
   }))).state;
-  assert.equal(L.cupQty(t, id(t, 'Chicken breast')), 0);
+  // #51: planning sets ingredients aside; the cupboard still shows what's physically there.
+  assert.equal(L.cupQty(t, id(t, 'Chicken breast')), 500);
+  assert.equal(L.setAsideFor(t, id(t, 'Chicken breast')), 500);
+  assert.equal(L.available(t, id(t, 'Chicken breast')), 0);
   assert.equal(list(t, 'Chicken breast').qty, 250);
   assert.equal(list(t, 'Chicken breast').reserved, 250);
-  assert.equal(L.cupQty(t, id(t, 'Onion')), 1.5);
-  assert.equal(L.cupQty(t, id(t, 'Chopped tomatoes')), 0.5);
+  assert.equal(L.cupQty(t, id(t, 'Onion')), 3);
+  assert.equal(L.available(t, id(t, 'Onion')), 1.5);
+  assert.equal(L.available(t, id(t, 'Chopped tomatoes')), 0.5);
   assert.equal(list(t, 'Coconut milk').qty, 1.5);
   assert.equal(L.buyQty(t, list(t, 'Coconut milk')), 2, 'tins rounded up to buy');
   assert.equal(list(t, 'Paprika').qty, 1);
   assert.equal(list(t, 'Paprika').reserved, 0);
   assert.equal(list(t, 'Ground cumin'), undefined);
-  assert.equal(L.cupQty(t, id(t, 'Basmati rice')), 550);
+  assert.equal(L.cupQty(t, id(t, 'Basmati rice')), 1000);
+  assert.equal(L.available(t, id(t, 'Basmati rice')), 550);
   assert.equal(t.week.meals.length, 1);
+});
+
+test('a second meal only uses what the first left free', async () => {
+  let s = L.sampleState();
+  s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 4, yes)).state; // onion 1 of 3
+  s = (await L.planMeal(s, recipe(s, 'Spaghetti bolognese'), 8, yes)).state; // onion 2 more
+  assert.equal(L.cupQty(s, id(s, 'Onion')), 3);
+  assert.equal(L.available(s, id(s, 'Onion')), 0);
+  assert.equal(list(s, 'Onion'), undefined, 'exactly enough');
+  s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 4, yes)).state;
+  assert.equal(list(s, 'Onion').qty, 1, 'third meal has to buy its onion');
 });
 
 test('frequently used items are double-checked; cancelling changes nothing', async () => {
@@ -45,30 +61,33 @@ test('frequently used items are double-checked; cancelling changes nothing', asy
   s = (await L.planMeal(s, recipe(s, 'Pancakes'), 2, scripted({
     'frequent:Milk': false, 'frequent:Eggs': true, 'frequent:Butter': true, 'unsized:Strawberry jam': true,
   }))).state;
-  assert.equal(L.cupQty(s, id(s, 'Milk')), 0);
+  assert.equal(L.cupQty(s, id(s, 'Milk')), 0, 'said it had run out');
   assert.equal(list(s, 'Milk').qty, 300);
-  assert.equal(L.cupQty(s, id(s, 'Eggs')), 4);
+  assert.equal(L.cupQty(s, id(s, 'Eggs')), 6);
+  assert.equal(L.available(s, id(s, 'Eggs')), 4);
   const before = JSON.stringify(s);
   assert.equal(await L.planMeal(s, recipe(s, 'Pancakes'), 2, async () => null), null);
   assert.equal(JSON.stringify(s), before);
 });
 
-test('ticking puts the surplus in the cupboard; unticking reverses it', async () => {
+test('ticking puts what was bought in the cupboard, set aside for its meal; unticking reverses it', async () => {
   let s = L.sampleState();
   s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 6, scripted({
     'multi:Ground cumin': true, 'multi:Paprika': false, 'multi:Olive oil': true,
   }))).state;
   L.setBought(s, list(s, 'Coconut milk').id, true);
-  assert.equal(L.cupQty(s, id(s, 'Coconut milk')), 0.5);
+  assert.equal(L.cupQty(s, id(s, 'Coconut milk')), 2, 'both tins bought');
+  assert.equal(L.available(s, id(s, 'Coconut milk')), 0.5, '1.5 set aside for the curry');
   L.setBought(s, list(s, 'Paprika').id, true);
   assert.equal(L.cupQty(s, id(s, 'Paprika')), 1);
   L.setBought(s, list(s, 'Paprika').id, false);
   assert.equal(L.cupQty(s, id(s, 'Paprika')), 0);
   L.setBought(s, list(s, 'Chicken breast').id, true);
-  assert.equal(L.cupQty(s, id(s, 'Chicken breast')), 0, 'bought chicken is reserved for the curry');
+  assert.equal(L.cupQty(s, id(s, 'Chicken breast')), 750);
+  assert.equal(L.available(s, id(s, 'Chicken breast')), 0, 'all chicken is for the curry');
 });
 
-test('new week: dropped meals return ingredients, short-life items get checked', async () => {
+test('new week: cooked meals use up ingredients, dropped ones keep them, short-life checked', async () => {
   let s = L.sampleState();
   s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 6, scripted({
     'multi:Ground cumin': true, 'multi:Paprika': false, 'multi:Olive oil': true,
@@ -89,9 +108,14 @@ test('new week: dropped meals return ingredients, short-life items get checked',
   s = r.state;
   assert.deepEqual(asked, ['cooked:Chicken curry', 'cooked:Pancakes', 'shortlife:Chicken breast']);
   assert.equal(L.cupQty(s, id(s, 'Chicken breast')), 0, 'binned');
-  assert.equal(L.cupQty(s, id(s, 'Onion')), 3, 'onions returned');
-  assert.equal(L.cupQty(s, id(s, 'Coconut milk')), 2, '0.5 surplus + 1.5 returned');
+  assert.equal(L.cupQty(s, id(s, 'Onion')), 3, 'dropped meal: onions never left');
+  assert.equal(L.cupQty(s, id(s, 'Coconut milk')), 2, 'dropped meal: bought tins stay');
   assert.equal(list(s, 'Spinach'), undefined, 'unbought spinach for the dropped meal is off the list');
+  // #51: the cooked pancakes are used up now
+  assert.equal(L.cupQty(s, id(s, 'Plain flour')), 900);
+  assert.equal(L.cupQty(s, id(s, 'Eggs')), 4);
+  assert.equal(L.cupQty(s, id(s, 'Butter')), 230);
+  assert.equal(list(s, 'Milk'), undefined, 'unbought milk for the cooked meal is off the list');
   assert.equal(s.week.meals.length, 0);
   assert.deepEqual(r.summary.cooked, ['Pancakes']);
 });
@@ -108,11 +132,12 @@ test('carried-over meals: out-of-date short-life items go back on the list', asy
   });
   s = r.state;
   assert.equal(s.week.meals.length, 1);
-  assert.equal(list(s, 'Beef mince').reserved, 500);
+  assert.equal(L.cupQty(s, id(s, 'Beef mince')), 0, 'old mince thrown out');
+  assert.equal(list(s, 'Beef mince').reserved, 500, 'and bought again');
   const pasta = L.cupQty(s, id(s, 'Spaghetti'));
   s = L.removeMeal(s, s.week.meals[0].id);
   assert.equal(list(s, 'Beef mince'), undefined);
-  assert.equal(L.cupQty(s, id(s, 'Spaghetti')), pasta + 400);
+  assert.equal(L.cupQty(s, id(s, 'Spaghetti')), pasta, 'not cooked: pasta stays');
 });
 
 test('sweep: gone / add to list / change amount / stop keeps progress', async () => {
@@ -128,14 +153,81 @@ test('sweep: gone / add to list / change amount / stop keeps progress', async ()
   assert.ok(r.total > 3);
 });
 
-test('#40 clear list: a later-dropped meal treats its shortfall as in hand', async () => {
+test('#40 clear list empties it; dropping the meal afterwards leaves the cupboard alone', async () => {
   let c = L.sampleState();
   c = (await L.planMeal(c, recipe(c, 'Chicken curry'), 6, yes)).state;
   L.addToShopping(c, id(c, 'Kitchen roll'), 2);
   L.clearShopping(c);
   assert.equal(c.shopping.length, 0);
   c = L.removeMeal(c, c.week.meals[0].id);
-  assert.equal(L.cupQty(c, id(c, 'Chicken breast')), 750, '500 from cupboard + 250 assumed in hand');
+  assert.equal(L.cupQty(c, id(c, 'Chicken breast')), 500);
+});
+
+// ---------- #51: the cupboard is what's physically there ----------
+
+test('#51 cooked meals are used up at the start of the next week, not before', async () => {
+  let s = L.sampleState();
+  s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 4, yes)).state;
+  L.setBought(s, list(s, 'Coconut milk').id, true);
+  list(s, 'Spinach').qty = 200; // bought a bigger bag than needed
+  L.setBought(s, list(s, 'Spinach').id, true);
+  L.setCooked(s, s.week.meals[0].id, true);
+  assert.equal(L.cupQty(s, id(s, 'Chicken breast')), 500, 'ticking cooked alone changes nothing');
+  s = (await L.startNewWeek(s, yes)).state;
+  assert.equal(L.cupQty(s, id(s, 'Chicken breast')), 0);
+  assert.equal(L.cupQty(s, id(s, 'Onion')), 2);
+  assert.equal(L.cupQty(s, id(s, 'Basmati rice')), 700);
+  assert.equal(L.cupQty(s, id(s, 'Coconut milk')), 0, 'the bought tin was used');
+  assert.equal(L.cupQty(s, id(s, 'Spinach')), 100, '200 g bought, 100 g used, the rest stays');
+});
+
+test('#51 groceries added via the cupboard or a sweep are still used up when cooked', async () => {
+  let s = L.sampleState();
+  s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 6, yes)).state;
+  L.clearShopping(s); // shopping put away by hand instead of ticked
+  L.setCup(s, id(s, 'Chicken breast'), 750);
+  L.setCup(s, id(s, 'Basmati rice'), 1000); // a sweep confirms the rice is all there
+  s = (await L.startNewWeek(s, async (q) => (q.kind === 'cooked' ? 'cooked' : true))).state;
+  assert.equal(L.cupQty(s, id(s, 'Chicken breast')), 0, 'the issue #51 case');
+  assert.equal(L.cupQty(s, id(s, 'Basmati rice')), 550);
+});
+
+test('#51 removing a meal marked cooked uses it up; an uncooked one leaves the cupboard alone', async () => {
+  let s = L.sampleState();
+  s = (await L.planMeal(s, recipe(s, 'Pancakes'), 2, yes)).state;
+  s = (await L.planMeal(s, recipe(s, 'Spaghetti bolognese'), 4, yes)).state;
+  const [pancakes, bolognese] = s.week.meals;
+  L.setCooked(s, pancakes.id, true);
+  s = L.removeMeal(s, pancakes.id);
+  assert.equal(L.cupQty(s, id(s, 'Plain flour')), 900);
+  s = L.removeMeal(s, bolognese.id);
+  assert.equal(L.cupQty(s, id(s, 'Spaghetti')), 500);
+});
+
+test('#51 data saved before the change is converted once', async () => {
+  // Simulate the old behaviour: planned curry with its ingredients already removed.
+  let s = L.sampleState();
+  s = (await L.planMeal(s, recipe(s, 'Chicken curry'), 6, yes)).state;
+  L.setCup(s, id(s, 'Chicken breast'), 0);
+  L.setCup(s, id(s, 'Onion'), 1.5);
+  L.setCup(s, id(s, 'Basmati rice'), 550);
+  const old = JSON.parse(JSON.stringify(s));
+  delete old.week.model;
+  const loaded = L.normalise(old);
+  assert.equal(loaded.week.model, 1);
+  assert.ok(L.needsMigration(loaded));
+  const m = L.migrate(loaded);
+  assert.equal(L.cupQty(m, id(m, 'Chicken breast')), 500);
+  assert.equal(L.cupQty(m, id(m, 'Onion')), 3);
+  assert.equal(L.cupQty(m, id(m, 'Basmati rice')), 1000);
+  assert.ok(!L.needsMigration(m));
+  assert.ok(!L.needsMigration(L.normalise(JSON.parse(JSON.stringify(m)))), 'only once');
+  assert.ok(!L.needsMigration(L.fromDocs(L.toDocs(m))), 'model travels with the sync docs');
+  assert.ok(!L.needsMigration(L.sampleState()) && !L.needsMigration(L.emptyState()));
+  const oldDocs = L.toDocs(loaded);
+  oldDocs.set('meta/week', { ...oldDocs.get('meta/week') });
+  delete oldDocs.get('meta/week').model;
+  assert.ok(L.needsMigration(L.fromDocs(oldDocs)), 'old household data is detected');
 });
 
 test('#49 optional ingredients: asked once, first; left-out ones untouched', async () => {
@@ -211,7 +303,7 @@ test('two devices editing at once merge without losing either change', async () 
   L.addToShopping(devB, id(devB, 'Bin bags'), 1);
   const chA = L.diffDocs(L.toDocs(baseA), L.toDocs(devA));
   const chB = L.diffDocs(L.toDocs(baseB), L.toDocs(devB));
-  assert.deepEqual(chA.set.map(([k]) => k.split('/')[0]), ['shopping'], 'A writes only the list entry');
+  assert.deepEqual(chA.set.map(([k]) => k.split('/')[0]).sort(), ['cupboard', 'shopping'], 'A writes just the list entry and the cupboard entry');
   assert.deepEqual(chB.set.map(([k]) => k.split('/')[0]).sort(), ['items', 'shopping']);
   for (const [k, v] of [...chA.set, ...chB.set]) server.set(k, v);
   const merged = L.fromDocs(server);
@@ -349,9 +441,10 @@ test('#50 items with a recipe unit: counted with a size, in-stock check without'
   assert.equal(L.toItemUnit(bread, 1, 'loaf'), 1);
   assert.equal(L.toItemUnit(jam, 1, 'tbsp'), null, 'no size → cannot count');
   assert.equal(L.toItemUnit(L.findItemByName(s, 'Milk'), 2, 'tbsp'), 30, 'tbsp of milk counted in ml');
-  // Cheese on toast: 2 slices of a 20-slice loaf come out of the cupboard
+  // Cheese on toast: 2 slices of a 20-slice loaf are set aside (#51)
   s = (await L.planMeal(s, recipe(s, 'Cheese on toast'), 1, yes)).state;
-  assert.equal(L.cupQty(s, id(s, 'Bread')), 0.9);
+  assert.equal(L.cupQty(s, id(s, 'Bread')), 1);
+  assert.equal(L.available(s, id(s, 'Bread')), 0.9);
   // Pancakes with jam: asked whether you have it, jar count untouched
   const asked = [];
   const r = await L.planMeal(s, recipe(s, 'Pancakes'), 2, async (q) => {
